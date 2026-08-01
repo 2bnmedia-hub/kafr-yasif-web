@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { WeatherData } from "./types";
 import { fetchWeather } from "./fetchWeather";
 import { getWeatherInfo } from "./weather-codes";
@@ -60,23 +60,31 @@ export function WeatherWidget() {
 
   const data = fetched ?? cached;
 
-  const refresh = useCallback(async () => {
-    try {
-      const fresh = await fetchWeather();
-      setFetched(fresh);
-      saveCache(fresh);
-    } catch {
-      // keep whatever is currently shown (cache or previous state) — weather is non-critical
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
   useEffect(() => {
+    let ignore = false;
+
+    function refresh() {
+      fetchWeather()
+        .then((fresh) => {
+          if (ignore) return;
+          setFetched(fresh);
+          saveCache(fresh);
+        })
+        .catch(() => {
+          // keep whatever is currently shown (cache or previous state) — weather is non-critical
+        })
+        .finally(() => {
+          if (!ignore) setLoading(false);
+        });
+    }
+
     refresh();
     const interval = setInterval(refresh, REFRESH_MS);
-    return () => clearInterval(interval);
-  }, [refresh]);
+    return () => {
+      ignore = true;
+      clearInterval(interval);
+    };
+  }, []);
 
   if (loading && !data) {
     return (
