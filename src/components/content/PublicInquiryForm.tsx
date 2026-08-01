@@ -33,6 +33,15 @@ export function PublicInquiryForm() {
 
   return (
     <form action={formAction} className="space-y-5 rounded-2xl bg-white p-6 shadow-sm ring-1 ring-zinc-100 sm:p-8" noValidate>
+      {/* Honeypot: hidden from real visitors via CSS + tabIndex/autoComplete, checked server-side in submitPublicInquiry. */}
+      <input
+        type="text"
+        name="_honey"
+        tabIndex={-1}
+        autoComplete="off"
+        aria-hidden="true"
+        className="absolute -left-[9999px] h-0 w-0 opacity-0"
+      />
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
         <div>
           <label htmlFor="fullName" className="mb-1 block text-sm font-medium text-ink-900">

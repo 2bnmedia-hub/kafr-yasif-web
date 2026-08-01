@@ -299,6 +299,16 @@ export const formSubmissions = pgTable("form_submissions", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+/** Per-IP submission tracking for public-facing forms. DB-backed for the same reason as
+ *  loginAttempts below — serverless functions don't share memory between invocations, so an
+ *  in-memory counter would reset (or diverge across instances) constantly. */
+export const formRateLimits = pgTable("form_rate_limits", {
+  id: serial("id").primaryKey(),
+  ip: varchar("ip", { length: 64 }).notNull(),
+  formType: varchar("form_type", { length: 100 }).notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
 export const adminUsers = pgTable("admin_users", {
   id: serial("id").primaryKey(),
   email: varchar("email", { length: 255 }).notNull().unique(),

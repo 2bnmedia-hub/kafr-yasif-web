@@ -2,9 +2,11 @@
 
 import { randomUUID } from "crypto";
 import { put } from "@vercel/blob";
+import * as z from "zod";
 import { getServerLocale } from "@/i18n/get-locale";
 import type { Locale } from "@/i18n/config";
 import { validateUploadedFile } from "@/lib/upload-validation";
+import { getClientIp, isFormRateLimited, recordFormSubmissionAttempt } from "@/lib/form-rate-limit";
 
 export type PublicInquiryState = {
   status: "idle" | "success" | "error";
@@ -15,16 +17,18 @@ export type PublicInquiryState = {
 // data tied to a named complaint, so this is deliberately smaller than the 50MB admin-media cap
 // and restricted to image/pdf — no office documents, which carry more macro/embedded-content risk.
 const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024; // 10MB
+const FORM_TYPE = "public-inquiry";
 
 const MESSAGES: Record<
   Locale,
-  { required: string; badEmail: string; badPhone: string; badFile: string; down: string; success: string }
+  { required: string; badEmail: string; badPhone: string; badFile: string; rateLimited: string; down: string; success: string }
 > = {
   he: {
     required: "נא למלא את כל שדות החובה.",
     badEmail: "כתובת הדואר האלקטרוני שהוזנה אינה תקינה.",
     badPhone: "מספר הטלפון שהוזן אינו תקין.",
     badFile: "לא ניתן לצרף את הקובץ. יש לצרף PDF או תמונה (JPG/PNG) עד 10MB.",
+    rateLimited: "נשלחו יותר מדי פניות מכתובת זו. נא לנסות שוב בעוד כמה דקות.",
     down: "מערכת קליטת הפניות בתחזוקה זמנית. אנא פנו ישירות במייל mivaker@kafr-yasif.muni.il.",
     success: "הפנייה נשלחה בהצלחה. ניצור איתך קשר בהקדם.",
   },
@@ -33,6 +37,7 @@ const MESSAGES: Record<
     badEmail: "عنوان البريد الإلكتروني الذي تم إدخاله غير صالح.",
     badPhone: "رقم الهاتف الذي تم إدخاله غير صالح.",
     badFile: "تعذر إرفاق الملف. يرجى إرفاق PDF أو صورة (JPG/PNG) حتى 10 ميغابايت.",
+    rateLimited: "تم إرسال عدد كبير جداً من الطلبات من هذا العنوان. يرجى المحاولة مرة أخرى بعد بضع دقائق.",
     down: "نظام استقبال الطلبات في صيانة مؤقتة. يرجى التواصل مباشرة عبر البريد الإلكتروني mivaker@kafr-yasif.muni.il.",
     success: "تم إرسال الطلب بنجاح. سنتواصل معك في أقرب وقت ممكن.",
   },
@@ -41,10 +46,23 @@ const MESSAGES: Record<
     badEmail: "The email address entered is not valid.",
     badPhone: "The phone number entered is not valid.",
     badFile: "The file couldn't be attached. Please attach a PDF or image (JPG/PNG) up to 10MB.",
+    rateLimited: "Too many inquiries have been sent from this address. Please try again in a few minutes.",
     down: "The inquiry system is temporarily under maintenance. Please contact us directly at mivaker@kafr-yasif.muni.il.",
     success: "Your inquiry has been sent successfully. We will contact you soon.",
   },
 };
+
+const inquirySchema = z.object({
+  fullName: z.string().trim().min(1),
+  email: z.string().trim().min(1).email(),
+  phone: z
+    .string()
+    .trim()
+    .min(1)
+    .regex(/^[\d\s+()-]{7,}$/),
+  department: z.string().trim().min(1),
+  subject: z.string().trim().min(1),
+});
 
 export async function submitPublicInquiry(
   _prevState: PublicInquiryState,
@@ -53,25 +71,36 @@ export async function submitPublicInquiry(
   const locale = await getServerLocale();
   const m = MESSAGES[locale];
 
-  const fullName = String(formData.get("fullName") ?? "").trim();
-  const email = String(formData.get("email") ?? "").trim();
-  const phone = String(formData.get("phone") ?? "").trim();
-  const department = String(formData.get("department") ?? "").trim();
-  const subject = String(formData.get("subject") ?? "").trim();
-  const file = formData.get("file");
-  const hasFile = file instanceof File && file.size > 0;
+  // Hidden honeypot field — real visitors never see or fill it (see PublicInquiryForm.tsx).
+  // Bots that fill every field get a fake success so they don't learn to avoid this field.
+  if (String(formData.get("_honey") ?? "").length > 0) {
+    return { status: "success", message: m.success };
+  }
 
-  if (!fullName || !email || !phone || !department || !subject) {
+  const ip = await getClientIp();
+  if (await isFormRateLimited(ip, FORM_TYPE)) {
+    return { status: "error", message: m.rateLimited };
+  }
+
+  const parsed = inquirySchema.safeParse({
+    fullName: formData.get("fullName"),
+    email: formData.get("email"),
+    phone: formData.get("phone"),
+    department: formData.get("department"),
+    subject: formData.get("subject"),
+  });
+
+  if (!parsed.success) {
+    const fieldErrors = z.flattenError(parsed.error).fieldErrors;
+    if (fieldErrors.email) return { status: "error", message: m.badEmail };
+    if (fieldErrors.phone) return { status: "error", message: m.badPhone };
     return { status: "error", message: m.required };
   }
 
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    return { status: "error", message: m.badEmail };
-  }
+  const { fullName, email, phone, department, subject } = parsed.data;
 
-  if (!/^[\d\s+()-]{7,}$/.test(phone)) {
-    return { status: "error", message: m.badPhone };
-  }
+  const file = formData.get("file");
+  const hasFile = file instanceof File && file.size > 0;
 
   if (hasFile && file.size > MAX_ATTACHMENT_BYTES) {
     return { status: "error", message: m.badFile };
@@ -108,8 +137,10 @@ export async function submitPublicInquiry(
   const { db } = await import("@/db");
   const { formSubmissions } = await import("@/db/schema");
 
+  await recordFormSubmissionAttempt(ip, FORM_TYPE);
+
   await db.insert(formSubmissions).values({
-    formType: "public-inquiry",
+    formType: FORM_TYPE,
     data: { fullName, email, phone, department, subject, attachment },
   });
 
