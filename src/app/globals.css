@@ -1,0 +1,303 @@
+@import "tailwindcss";
+
+:root {
+  /* Brand palette sampled from the council's official logo + site */
+  --color-teal-900: #12323d;
+  --color-teal-800: #1a4553;
+  --color-teal-700: #1e5266;
+  --color-teal-600: #2c6a76;
+  --color-teal-500: #417c79;
+  --color-teal-100: #e3edec;
+
+  --color-gold-600: #c07f2c;
+  --color-gold-500: #d99a3d;
+  --color-gold-100: #f7e9d3;
+  /* Text-safe darker variant of gold-600 (WCAG AA 4.5:1+ on white/gold-100); gold-600 itself fails
+     for text and should stay reserved for icons/accents/large decorative use. */
+  --color-gold-700: #86591f;
+
+  --color-olive-600: #6ea52f;
+  --color-olive-500: #8ec640;
+  /* Text-safe darker variant of olive-600, same rationale as gold-700. */
+  --color-olive-700: #4d7321;
+
+  --color-cream-50: #fbf7f0;
+  --color-ink-900: #16232a;
+  --color-ink-600: #47585f;
+  --color-ink-400: #647278;
+
+  /* Header/navbar brand accent (premium navbar spec) */
+  --color-brand-blue: #175ae2;
+  --color-brand-navy: #0c2346;
+
+  --background: #ffffff;
+  --foreground: var(--color-ink-900);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+
+  --color-teal-900: var(--color-teal-900);
+  --color-teal-800: var(--color-teal-800);
+  --color-teal-700: var(--color-teal-700);
+  --color-teal-600: var(--color-teal-600);
+  --color-teal-500: var(--color-teal-500);
+  --color-teal-100: var(--color-teal-100);
+
+  --color-gold-600: var(--color-gold-600);
+  --color-gold-500: var(--color-gold-500);
+  --color-gold-100: var(--color-gold-100);
+  --color-gold-700: var(--color-gold-700);
+
+  --color-olive-600: var(--color-olive-600);
+  --color-olive-500: var(--color-olive-500);
+  --color-olive-700: var(--color-olive-700);
+
+  --color-cream-50: var(--color-cream-50);
+  --color-ink-900: var(--color-ink-900);
+  --color-ink-600: var(--color-ink-600);
+  --color-ink-400: var(--color-ink-400);
+
+  --color-brand-blue: var(--color-brand-blue);
+  --color-brand-navy: var(--color-brand-navy);
+
+  --font-sans: var(--font-assistant);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans), system-ui, sans-serif;
+}
+
+/* WCAG-friendly visible focus ring for keyboard navigation, government pattern requirement */
+:focus-visible {
+  outline: 3px solid var(--color-gold-500);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+.skip-link {
+  position: absolute;
+  inset-inline-start: 1rem;
+  top: -3rem;
+  z-index: 100;
+  background: var(--color-teal-900);
+  color: white;
+  padding: 0.75rem 1.25rem;
+  border-radius: 0.5rem;
+  transition: top 0.15s ease;
+}
+
+.skip-link:focus {
+  top: 1rem;
+}
+
+/* Accessibility widget toggles (see AccessibilityWidget.tsx) — applied to <html> */
+.a11y-contrast {
+  filter: contrast(1.3) saturate(1.05);
+}
+
+.a11y-highlight-links a {
+  text-decoration: underline !important;
+  text-decoration-thickness: 2px !important;
+  text-underline-offset: 2px !important;
+  font-weight: 700 !important;
+}
+
+.a11y-readable-font,
+.a11y-readable-font * {
+  font-family: Arial, Helvetica, sans-serif !important;
+  letter-spacing: 0.01em !important;
+}
+
+.a11y-stop-animations,
+.a11y-stop-animations * {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+  scroll-behavior: auto !important;
+}
+
+@keyframes ticker-scroll {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(50%);
+  }
+}
+
+.animate-ticker {
+  animation: ticker-scroll 45s linear infinite;
+}
+
+.animate-ticker:hover {
+  animation-play-state: paused;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-ticker {
+    animation: none;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes dropIn {
+  from {
+    opacity: 0;
+    transform: translateY(-12px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* premium header CTA: diagonal shine sweep on hover */
+.cta-shine {
+  position: relative;
+  overflow: hidden;
+}
+
+.cta-shine::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -75%;
+  width: 45%;
+  height: 100%;
+  background: linear-gradient(120deg, transparent, rgba(255, 255, 255, 0.55), transparent);
+  transform: skewX(-20deg);
+  transition: left 0.6s ease;
+}
+
+.cta-shine:hover::after {
+  left: 125%;
+}
+
+/* Rich text editor + rendered rich content — shared so admin editing matches the public page output. */
+.rte-content,
+.rte-render {
+  line-height: 1.8;
+}
+
+.rte-content p,
+.rte-render p {
+  margin-block: 0.75em;
+}
+
+.rte-content h2,
+.rte-render h2 {
+  margin-block: 1em 0.5em;
+  font-size: 1.375rem;
+  font-weight: 700;
+  color: var(--color-teal-900);
+}
+
+.rte-content h3,
+.rte-render h3 {
+  margin-block: 0.85em 0.4em;
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--color-teal-900);
+}
+
+.rte-content ul,
+.rte-render ul {
+  list-style: disc;
+  padding-inline-start: 1.5em;
+  margin-block: 0.6em;
+}
+
+.rte-content ol,
+.rte-render ol {
+  list-style: decimal;
+  padding-inline-start: 1.5em;
+  margin-block: 0.6em;
+}
+
+.rte-content blockquote,
+.rte-render blockquote {
+  border-inline-start: 3px solid var(--color-teal-500);
+  padding-inline-start: 1em;
+  margin-block: 0.75em;
+  color: var(--color-ink-600);
+  font-style: italic;
+}
+
+.rte-content a,
+.rte-render a {
+  color: var(--color-teal-700);
+  text-decoration: underline;
+}
+
+.rte-content img,
+.rte-render img {
+  max-width: 100%;
+  border-radius: 0.75rem;
+  margin-block: 0.75em;
+}
+
+.rte-content table,
+.rte-render table {
+  border-collapse: collapse;
+  width: 100%;
+  margin-block: 0.75em;
+}
+
+.rte-content th,
+.rte-content td,
+.rte-render th,
+.rte-render td {
+  border: 1px solid var(--color-teal-100);
+  padding: 0.5em 0.75em;
+  text-align: start;
+}
+
+.rte-content th,
+.rte-render th {
+  background: var(--color-cream-50);
+  font-weight: 700;
+}
+
+.rte-content p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: inline-start;
+  color: var(--color-ink-600);
+  opacity: 0.6;
+  pointer-events: none;
+  height: 0;
+}
+
+/* Premium admin dashboard — shared elevation/gradient language. */
+.admin-shadow-card {
+  box-shadow:
+    0 1px 2px rgba(12, 35, 70, 0.04),
+    0 8px 24px -8px rgba(12, 35, 70, 0.1);
+}
+
+.admin-shadow-raised {
+  box-shadow:
+    0 2px 4px rgba(12, 35, 70, 0.06),
+    0 16px 40px -12px rgba(12, 35, 70, 0.18);
+}
+
+.admin-sidebar-gradient {
+  background: linear-gradient(175deg, #12323d 0%, #0c2346 100%);
+}
+
+.admin-content-gradient {
+  background:
+    radial-gradient(1200px 400px at 100% -10%, rgba(30, 82, 102, 0.06), transparent),
+    radial-gradient(900px 400px at -10% 0%, rgba(217, 154, 61, 0.05), transparent), #fafaf9;
+}
