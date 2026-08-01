@@ -85,7 +85,6 @@ export const footerColumns: { title: string; links: NavItem[] }[] = [
       { label: "ספורט", href: "/ספורט" },
       { label: "שיטור מקומי", href: "/שיטור-מקומי" },
       { label: "ביטחון קהילתי", href: "/ביטחון-קהילתי" },
-      { label: "מזכירות", href: "/מזכירות" },
     ],
   },
   {
