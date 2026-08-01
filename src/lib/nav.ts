@@ -29,7 +29,7 @@ export const quickTags: { label: string; href: string; icon: string; external?: 
   },
   { label: "פניות הציבור", href: "/פניות-הציבור", icon: "/icons/public-inquiries.png" },
   { label: "תלונות הציבור", href: "/תלונות-הציבור", icon: "/icons/public-complaints.png" },
-  { label: "ביטחון וחירום", href: "/ביטחוןוחירום", icon: "/icons/security-emergency.png" },
+  { label: "ביטחון וחירום", href: "/אגף-חירום-וביטחון", icon: "/icons/security-emergency.png" },
   { label: "מכרזים", href: "/מכרזים", icon: "/icons/tenders.png" },
   { label: "מוקד שירות", href: "/צור-קשר", icon: "/icons/service-center.png" },
 ];
@@ -111,13 +111,19 @@ function submenuFor(columnTitle: string): NavItem[] {
 
 export type MainNavItem = NavItem & { submenu?: NavItem[] };
 
-/** Header nav with dropdown submenus, sourced from the same real per-section link lists as the footer. */
+/**
+ * Header nav with dropdown submenus, sourced from the same real per-section link lists as the
+ * footer. The category parent items below (מרכזי מידע / מחלקות המועצה / שירותי תושב / ביטחון
+ * וחירום) have no real hub page of their own — the matching CMS rows exist only as unpublished,
+ * content-less stubs migrated from the old site's scrape — so each parent links straight to its
+ * first real submenu page instead of a 404.
+ */
 export const mainNavWithSubmenu: MainNavItem[] = [
   { label: "דף בית", href: "/" },
-  { label: "מרכזי מידע", href: "/מרכזמידע", submenu: submenuFor("מרכזי מידע") },
-  { label: "מחלקות המועצה", href: "/מחלקות-המועצה", submenu: submenuFor("מחלקות המועצה") },
-  { label: "שירותי תושב", href: "/שירותי-תושב", submenu: submenuFor("שירות לתושב") },
-  { label: "ביטחון וחירום", href: "/ביטחוןוחירום", submenu: submenuFor("ביטחון וחירום") },
+  { label: "מרכזי מידע", href: submenuFor("מרכזי מידע")[0]?.href ?? "/", submenu: submenuFor("מרכזי מידע") },
+  { label: "מחלקות המועצה", href: submenuFor("מחלקות המועצה")[0]?.href ?? "/", submenu: submenuFor("מחלקות המועצה") },
+  { label: "שירותי תושב", href: submenuFor("שירות לתושב")[0]?.href ?? "/", submenu: submenuFor("שירות לתושב") },
+  { label: "ביטחון וחירום", href: submenuFor("ביטחון וחירום")[0]?.href ?? "/", submenu: submenuFor("ביטחון וחירום") },
   { label: "צור קשר", href: "/צור-קשר" },
 ];
 

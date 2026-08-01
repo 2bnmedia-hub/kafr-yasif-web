@@ -45,11 +45,15 @@ export const sectionLabelsByLocale: Record<Locale, Record<NavSection, string>> =
 /** Hebrew-only labels for the (Hebrew-only) admin dashboard; public pages use sectionLabelsByLocale. */
 export const sectionLabels: Record<NavSection, string> = sectionLabelsByLocale.he;
 
+// The four section "hub" slugs below have no real page: the matching CMS rows exist only as
+// unpublished, content-less stubs migrated from the old site's scrape (see src/lib/nav.ts for the
+// same issue on the header dropdown). Point breadcrumbs at each section's first real page instead
+// of a 404 — keep these in sync with the first entry of the matching footer column in nav.ts.
 export const sectionHrefs: Record<NavSection, string> = {
-  "info-center": "/מרכזמידע",
-  departments: "/מחלקות-המועצה",
-  "resident-services": "/שירותי-תושב",
-  emergency: "/ביטחוןוחירום",
+  "info-center": "/נעים-להכיר",
+  departments: "/לשכת-ראש-המועצה",
+  "resident-services": "/מכרזים",
+  emergency: "/אגף-חירום-וביטחון",
   contact: "/צור-קשר",
   other: "/",
 };
