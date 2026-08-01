@@ -9,6 +9,38 @@ export function PageArticle({ children }: { children: ReactNode }) {
   return <article className="mx-auto max-w-4xl px-4 py-10 sm:px-6 lg:px-8">{children}</article>;
 }
 
+// Update this whenever the emergency guidance content below it changes (e.g. the shelter
+// response time). It's what lets a resident tell how current the instructions are, and it
+// points to the one place that's always authoritative regardless of what this page says.
+const EMERGENCY_CONTENT_UPDATED_AT = "2026-08-01";
+
+const EMERGENCY_NOTICE_TEXT: Record<Locale, { label: string; linkLabel: string }> = {
+  he: { label: "עודכן לאחרונה:", linkLabel: "למידע עדכני תמיד: אתר פיקוד העורף" },
+  ar: { label: "آخر تحديث:", linkLabel: "للمعلومات المحدّثة دائماً: موقع الجبهة الداخلية" },
+  en: { label: "Last updated:", linkLabel: "For always-current information: Home Front Command" },
+};
+
+export function EmergencyUpdateNotice({ locale }: { locale: Locale }) {
+  const t = EMERGENCY_NOTICE_TEXT[locale];
+  return (
+    <p className="-mt-2 mb-4 flex flex-wrap items-center gap-1.5 text-xs text-ink-600">
+      <span>
+        {t.label} {EMERGENCY_CONTENT_UPDATED_AT}
+      </span>
+      <span aria-hidden="true">·</span>
+      <a
+        href="https://www.oref.org.il"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="inline-flex items-center gap-1 text-teal-700 hover:underline"
+      >
+        <ExternalLink size={11} aria-hidden="true" />
+        {t.linkLabel}
+      </a>
+    </p>
+  );
+}
+
 export function Breadcrumb({ title, locale = "he" }: { title: string; locale?: Locale }) {
   const dict = getDictionary(locale);
   return (

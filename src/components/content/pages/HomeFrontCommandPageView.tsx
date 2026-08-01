@@ -1,5 +1,5 @@
 import { Home, Radio, Backpack, Building2, Phone, ExternalLink } from "lucide-react";
-import { PageArticle, Breadcrumb, Hero, NumberedSection, BulletList, LinkedBanner } from "../premium/Shared";
+import { PageArticle, Breadcrumb, Hero, NumberedSection, BulletList, LinkedBanner, EmergencyUpdateNotice } from "../premium/Shared";
 import type { Locale } from "@/i18n/config";
 
 type Props = {
@@ -41,7 +41,7 @@ const CONTENT: Record<Locale, LocaleContent> = {
     bannerAlt: "הנחיות ופקודות פיקוד העורף",
     section1Title: "בחירת המרחב המוגן והכנתו",
     section1Intro:
-      "בזמן קבלת התרעה, עומדות לרשותנו 90 שניות (דקה וחצי) להגיע למרחב המוגן. יש לבחור את המרחב המוגן לפי סדר העדיפויות הבא:",
+      "בזמן קבלת התרעה, עומדות לרשותנו 45 שניות להגיע למרחב המוגן. יש לבחור את המרחב המוגן לפי סדר העדיפויות הבא:",
     shelterPoints: [
       { bold: 'ממ"ד (מרחב מוגן דירתי) או ממ"ק (מרחב מוגן קומתי):', text: "אלו האופציות המועדפות ביותר." },
       { bold: "מקלט:", text: "בתנאי שהמקלט נמצא בתוך המבנה וניתן להגיע אליו תוך פרק הזמן המוגדר." },
@@ -83,7 +83,7 @@ const CONTENT: Record<Locale, LocaleContent> = {
       "المجلس المحلي كفر ياسيف – نستعد في الروتين، ونكون محميين في الطوارئ. يعمل مجلس كفر ياسيف بتنسيق تام وتعاون وثيق مع قيادة الجبهة الداخلية لضمان جاهزية البلدة لأي سيناريو. تذكروا: تعليمات قيادة الجبهة الداخلية تنقذ الأرواح. أثبت الالتزام بالتعليمات أنه العامل الحاسم في الحد من الإصابات.",
     bannerAlt: "تعليمات وأوامر قيادة الجبهة الداخلية",
     section1Title: "اختيار المكان المحمي وتجهيزه",
-    section1Intro: "عند تلقي إنذار، تتوفر لدينا 90 ثانية (دقيقة ونصف) للوصول إلى المكان المحمي. يجب اختيار المكان المحمي وفق ترتيب الأولويات التالي:",
+    section1Intro: "عند تلقي إنذار، تتوفر لدينا 45 ثانية للوصول إلى المكان المحمي. يجب اختيار المكان المحمي وفق ترتيب الأولويات التالي:",
     shelterPoints: [
       { bold: 'الغرفة المحمية للشقة أو الغرفة المحمية للطابق:', text: "هذان الخياران هما الأكثر تفضيلاً." },
       { bold: "الملجأ:", text: "بشرط أن يكون الملجأ داخل المبنى ويمكن الوصول إليه خلال المهلة الزمنية المحددة." },
@@ -126,7 +126,7 @@ const CONTENT: Record<Locale, LocaleContent> = {
     bannerAlt: "Home Front Command guidelines and instructions",
     section1Title: "Choosing and Preparing the Protected Space",
     section1Intro:
-      "When an alert is received, we have 90 seconds (a minute and a half) to reach the protected space. The protected space should be chosen according to the following order of priority:",
+      "When an alert is received, we have 45 seconds to reach the protected space. The protected space should be chosen according to the following order of priority:",
     shelterPoints: [
       { bold: "Mamad (apartment safe room) or Mamak (floor safe room):", text: "These are the most preferred options." },
       { bold: "Shelter:", text: "Provided the shelter is within the building and can be reached within the defined time frame." },
@@ -182,6 +182,8 @@ export function HomeFrontCommandPageView({ title, locale }: Props) {
       <Hero title={title} subtitle={c.heroSubtitle}>
         {c.heroIntro}
       </Hero>
+
+      <EmergencyUpdateNotice locale={locale} />
 
       <div className="space-y-4">
         <NumberedSection index={1} icon={Home} title={c.section1Title}>

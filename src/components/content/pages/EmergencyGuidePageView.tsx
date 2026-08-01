@@ -1,5 +1,5 @@
 import { Home, Zap, HeartHandshake, Building2, Phone, ExternalLink } from "lucide-react";
-import { PageArticle, Breadcrumb, Hero, NumberedSection, BulletList, LinkedBanner } from "../premium/Shared";
+import { PageArticle, Breadcrumb, Hero, NumberedSection, BulletList, LinkedBanner, EmergencyUpdateNotice } from "../premium/Shared";
 import type { Locale } from "@/i18n/config";
 
 type Props = {
@@ -64,7 +64,7 @@ const CONTENT: Record<Locale, LocaleContent> = {
     s1Title: "המוכנות המשפחתית: הצעדים שעושים היום",
     s1Intro: 'בעריות גדולות מושם דגש על "משפחה כצבא קטן". בצעו את שלושת השלבים הבאים:',
     s1Point1Bold: 'בחירת ה"מרחב המוגן הביתי":',
-    s1Point1Text: "ודאו שכל בני המשפחה מכירים את החדר שנבחר ומסוגלים להגיע אליו בתוך 90 שניות.",
+    s1Point1Text: "ודאו שכל בני המשפחה מכירים את החדר שנבחר ומסוגלים להגיע אליו בתוך 45 שניות.",
     s1Point2Bold1: "הכנת תיק ה-72 (ערכת הישרדות):",
     s1Point2Text1: "הכינו תיק שיאפשר לכם שהייה עצמאית למשך 3 יממות.",
     s1Point2Bold2: "חובה:",
@@ -126,7 +126,7 @@ const CONTENT: Record<Locale, LocaleContent> = {
     s1Title: "الجاهزية العائلية: الخطوات التي تُتخذ اليوم",
     s1Intro: 'في البلديات الكبرى يُشدَّد على مبدأ "العائلة كجيش صغير". اتبعوا الخطوات الثلاث التالية:',
     s1Point1Bold: 'اختيار "المكان المحمي المنزلي":',
-    s1Point1Text: "تأكدوا من أن جميع أفراد الأسرة يعرفون الغرفة المختارة وقادرون على الوصول إليها خلال 90 ثانية.",
+    s1Point1Text: "تأكدوا من أن جميع أفراد الأسرة يعرفون الغرفة المختارة وقادرون على الوصول إليها خلال 45 ثانية.",
     s1Point2Bold1: "تجهيز حقيبة الـ72 ساعة (عدة النجاة):",
     s1Point2Text1: "جهّزوا حقيبة تتيح لكم البقاء بشكل مستقل لمدة 3 أيام.",
     s1Point2Bold2: "إلزامي:",
@@ -188,7 +188,7 @@ const CONTENT: Record<Locale, LocaleContent> = {
     s1Title: "Family Readiness: Steps to Take Today",
     s1Intro: 'Large municipalities emphasize the principle of "family as a small army." Follow these three steps:',
     s1Point1Bold: 'Choosing the "home protected space":',
-    s1Point1Text: "Make sure all family members know the chosen room and can reach it within 90 seconds.",
+    s1Point1Text: "Make sure all family members know the chosen room and can reach it within 45 seconds.",
     s1Point2Bold1: "Preparing a 72-hour survival kit:",
     s1Point2Text1: "Prepare a bag that will allow you to be self-sufficient for 3 days.",
     s1Point2Bold2: "Required:",
@@ -254,6 +254,8 @@ export function EmergencyGuidePageView({ title, locale }: Props) {
       <Hero title={title} subtitle={c.heroSubtitle}>
         {c.heroBody}
       </Hero>
+
+      <EmergencyUpdateNotice locale={locale} />
 
       <div className="space-y-4">
         <NumberedSection index={1} icon={Home} title={c.s1Title}>

@@ -1,5 +1,5 @@
 import { ShieldAlert, Radio, Camera, AlertTriangle, ExternalLink } from "lucide-react";
-import { PageArticle, Breadcrumb, Hero, NumberedSection, BulletList, LinkedBanner } from "../premium/Shared";
+import { PageArticle, Breadcrumb, Hero, NumberedSection, BulletList, LinkedBanner, EmergencyUpdateNotice } from "../premium/Shared";
 import type { Locale } from "@/i18n/config";
 
 type Props = {
@@ -157,6 +157,8 @@ export function EmergencySecurityPageView({ title, locale }: Props) {
       <Hero title={title} subtitle={c.heroSubtitle}>
         {c.heroBody}
       </Hero>
+
+      <EmergencyUpdateNotice locale={locale} />
 
       <div className="space-y-4">
         <NumberedSection index={1} icon={ShieldAlert} title={c.s1Title}>
