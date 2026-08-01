@@ -1,0 +1,7 @@
+# CLI deploys (`vercel deploy`) do not reliably honor .gitignore — these must be
+# listed explicitly or they get uploaded into the deployment's own Source view,
+# visible to anyone with dashboard access, regardless of git history.
+.env*
+.admin-credentials.local.txt
+my files
+.git 2
