@@ -44,7 +44,7 @@ export default async function EditNewsPage({ params }: { params: Promise<{ id: s
           <p className="text-sm text-ink-600">{item.title}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Link href={`/news/${item.slug}`} target="_blank" className="flex items-center gap-1.5 rounded-full bg-teal-100 px-4 py-2 text-xs font-semibold text-teal-900 hover:bg-teal-200">
+          <Link href={`/news/${item.slug}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 rounded-full bg-teal-100 px-4 py-2 text-xs font-semibold text-teal-900 hover:bg-teal-200">
             <Eye size={14} aria-hidden="true" />
             צפייה באתר
           </Link>

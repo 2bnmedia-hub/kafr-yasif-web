@@ -31,6 +31,7 @@ export default async function EditFormPage({ params }: { params: Promise<{ id: s
           <Link
             href="/טפסים"
             target="_blank"
+            rel="noopener noreferrer"
             className="flex items-center gap-1.5 rounded-full bg-teal-100 px-4 py-2 text-xs font-semibold text-teal-900 hover:bg-teal-200"
           >
             <Eye size={14} aria-hidden="true" />

@@ -27,7 +27,7 @@ export default async function AdminPagesList() {
                 <td className="px-4 py-3 font-medium text-ink-900">{p.title}</td>
                 <td className="px-4 py-3 text-ink-600">{sectionLabels[p.navSection]}</td>
                 <td className="px-4 py-3 text-ink-600">
-                  <a href={`/${p.slug}`} target="_blank" className="text-teal-700 hover:underline">
+                  <a href={`/${p.slug}`} target="_blank" rel="noopener noreferrer" className="text-teal-700 hover:underline">
                     /{p.slug}
                   </a>
                 </td>
