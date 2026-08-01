@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { Accessibility, X, Plus, Minus, Contrast, Link2, PauseCircle, Type, RotateCcw } from "lucide-react";
 
 type A11ySettings = {
@@ -34,22 +35,25 @@ function applySettings(s: A11ySettings) {
 
 export function AccessibilityWidget() {
   const [open, setOpen] = useState(false);
-  const [settings, setSettings] = useState<A11ySettings>(DEFAULT_SETTINGS);
+  const [settings, setSettings] = useState<A11ySettings>(() => {
+    if (typeof window === "undefined") return DEFAULT_SETTINGS;
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) return JSON.parse(saved) as A11ySettings;
+    } catch {
+      // ignore malformed/unavailable storage
+    }
+    return DEFAULT_SETTINGS;
+  });
   const dialogRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved) as A11ySettings;
-        setSettings(parsed);
-        applySettings(parsed);
-      }
-    } catch {
-      // ignore malformed/unavailable storage
-    }
+    applySettings(settings);
+    // Only sync to the DOM on mount from the lazily-read initial state;
+    // subsequent changes apply directly inside update().
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function update(next: Partial<A11ySettings>) {
@@ -187,9 +191,9 @@ export function AccessibilityWidget() {
               <RotateCcw size={13} aria-hidden="true" />
               איפוס הגדרות
             </button>
-            <a href="/הצהרת-נגישות" className="mt-2 block text-center text-[11px] font-medium text-teal-700 hover:underline">
+            <Link href="/הצהרת-נגישות" className="mt-2 block text-center text-[11px] font-medium text-teal-700 hover:underline">
               הצהרת נגישות מלאה
-            </a>
+            </Link>
           </div>
         </div>
       )}
