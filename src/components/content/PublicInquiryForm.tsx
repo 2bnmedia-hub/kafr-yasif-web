@@ -108,8 +108,13 @@ export function PublicInquiryForm() {
           id="file"
           name="file"
           type="file"
+          accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
+          aria-describedby="file-hint"
           className="w-full rounded-lg border border-teal-100 bg-white px-4 py-2.5 text-sm text-ink-900 file:ml-3 file:rounded-full file:border-0 file:bg-teal-700 file:px-4 file:py-1.5 file:text-xs file:font-semibold file:text-white"
         />
+        <p id="file-hint" className="mt-1 text-xs text-ink-600">
+          PDF או תמונה (JPG/PNG) בלבד, עד 10MB.
+        </p>
       </div>
 
       <div>

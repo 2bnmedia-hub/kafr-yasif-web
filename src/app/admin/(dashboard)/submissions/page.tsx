@@ -2,6 +2,12 @@ import { db } from "@/db";
 import { formSubmissions } from "@/db/schema";
 import { desc } from "drizzle-orm";
 
+type Attachment = { pathname: string; originalName: string; mimeType: string; sizeBytes: number };
+
+function isAttachment(value: unknown): value is Attachment {
+  return typeof value === "object" && value !== null && "pathname" in value && "originalName" in value;
+}
+
 export default async function AdminSubmissionsPage() {
   const rows = await db.select().from(formSubmissions).orderBy(desc(formSubmissions.createdAt));
 
@@ -11,7 +17,7 @@ export default async function AdminSubmissionsPage() {
       <p className="mb-6 text-sm text-ink-600">{rows.length} פניות</p>
       <div className="space-y-3">
         {rows.map((s) => {
-          const data = s.data as Record<string, string>;
+          const data = s.data as Record<string, unknown>;
           return (
             <div key={s.id} className="admin-shadow-card rounded-2xl bg-white p-4 text-sm">
               <div className="mb-1 flex items-center justify-between text-ink-600">
@@ -19,12 +25,30 @@ export default async function AdminSubmissionsPage() {
                 <time>{new Date(s.createdAt).toLocaleString("he-IL")}</time>
               </div>
               <dl className="grid grid-cols-1 gap-1 sm:grid-cols-2">
-                {Object.entries(data).map(([key, value]) => (
-                  <div key={key}>
-                    <dt className="inline font-medium text-ink-900">{key}: </dt>
-                    <dd className="inline text-ink-600">{value}</dd>
-                  </div>
-                ))}
+                {Object.entries(data).map(([key, value]) => {
+                  if (value === null) return null;
+                  if (isAttachment(value)) {
+                    return (
+                      <div key={key}>
+                        <dt className="inline font-medium text-ink-900">קובץ מצורף: </dt>
+                        <dd className="inline">
+                          <a
+                            href={`/api/admin/submissions/download?pathname=${encodeURIComponent(value.pathname)}`}
+                            className="text-teal-700 underline underline-offset-2 hover:text-teal-900"
+                          >
+                            {value.originalName}
+                          </a>
+                        </dd>
+                      </div>
+                    );
+                  }
+                  return (
+                    <div key={key}>
+                      <dt className="inline font-medium text-ink-900">{key}: </dt>
+                      <dd className="inline text-ink-600">{String(value)}</dd>
+                    </div>
+                  );
+                })}
               </dl>
             </div>
           );
