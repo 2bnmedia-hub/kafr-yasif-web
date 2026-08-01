@@ -14,8 +14,6 @@ export function VisitTracker() {
     } else {
       fetch("/api/track-visit", { method: "POST", body: payload, keepalive: true }).catch(() => {});
     }
-    // Intentionally track only on mount per pathname change, not on every re-render.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname]);
 
   return null;
