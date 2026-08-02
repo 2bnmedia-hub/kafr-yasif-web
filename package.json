@@ -4,9 +4,11 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "prebuild": "tsx scripts/check-slug-typography.ts",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "check:slugs": "tsx scripts/check-slug-typography.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",

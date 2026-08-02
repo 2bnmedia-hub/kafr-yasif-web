@@ -1,8 +1,11 @@
 /** Turns a title into a URL-safe slug, keeping Hebrew/Arabic letters (matches this site's existing Hebrew-slug convention). */
 export function slugify(input: string): string {
   return input
-    .trim()
-    .replace(/["'׳״]/g, "")
+    .normalize("NFC")
+    // Straight and curly quote marks (ASCII ' ", right/left single quotes U+2019/U+2018,
+    // Hebrew geresh/gershayim U+05F3/U+05F4) — content pasted from Word/Docs autocorrects
+    // straight quotes to curly ones, and those must never survive into a slug.
+    .replace(/["'‘’׳״]/g, "")
     .replace(/[^\p{L}\p{N}]+/gu, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 120) || "item";

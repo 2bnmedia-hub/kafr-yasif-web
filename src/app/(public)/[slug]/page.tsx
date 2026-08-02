@@ -98,6 +98,19 @@ const CUSTOM_PAGES: Record<
 // Pages are DB-backed (CMS-managed); revalidate periodically and instantly on admin save via revalidatePath.
 export const revalidate = 3600;
 
+// Next's router already decodes the raw route param before we see it; this second decode only
+// matters for a slug that legitimately contains a literal "%" (e.g. "50%-הנחה"), where
+// decodeURIComponent can throw "URI malformed". Never let a bad param crash the route — treat it
+// as an unknown slug instead. Proxy (src/proxy.ts) is the primary guard against malformed raw
+// request URLs; this is a second, cheap layer in case a route is ever reached without it.
+function safeDecodeSlug(rawSlug: string): string | null {
+  try {
+    return decodeURIComponent(rawSlug);
+  } catch {
+    return null;
+  }
+}
+
 export async function generateStaticParams() {
   const slugs = await getAllPageSlugs();
   return slugs.map((slug) => ({ slug }));
@@ -109,7 +122,10 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
-  const [page, locale] = await Promise.all([getPageBySlug(decodeURIComponent(slug)), getServerLocale()]);
+  const decodedSlug = safeDecodeSlug(slug);
+  if (decodedSlug === null) return {};
+
+  const [page, locale] = await Promise.all([getPageBySlug(decodedSlug), getServerLocale()]);
   if (!page) return {};
 
   const title = (locale === "ar" ? page.titleAr : locale === "en" ? page.titleEn : page.title) || page.title;
@@ -132,7 +148,10 @@ export async function generateMetadata({
 
 export default async function Page({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const [page, locale] = await Promise.all([getPageBySlug(decodeURIComponent(slug)), getServerLocale()]);
+  const decodedSlug = safeDecodeSlug(slug);
+  if (decodedSlug === null) notFound();
+
+  const [page, locale] = await Promise.all([getPageBySlug(decodedSlug), getServerLocale()]);
   if (!page || !page.published) notFound();
 
   const Custom = CUSTOM_PAGES[page.slug];
