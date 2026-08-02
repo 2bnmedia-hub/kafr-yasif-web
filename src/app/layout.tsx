@@ -3,6 +3,7 @@ import { Assistant } from "next/font/google";
 import { headers } from "next/headers";
 import { getServerLocale } from "@/i18n/get-locale";
 import { LOCALE_DIR, DEFAULT_LOCALE } from "@/i18n/config";
+import { StagingBanner } from "@/components/layout/StagingBanner";
 import "./globals.css";
 
 const assistant = Assistant({
@@ -38,13 +39,16 @@ export default async function RootLayout({
   const headerList = await headers();
   // The admin panel is always Hebrew/RTL regardless of the visitor's public-site locale
   // cookie — otherwise a visitor who switched the public site to en/ar would land on
-  // /admin with the whole panel mirrored to LTR. See src/middleware.ts for x-pathname.
+  // /admin with the whole panel mirrored to LTR. See src/proxy.ts for x-pathname.
   const isAdmin = (headerList.get("x-pathname") ?? "").startsWith("/admin");
   const locale = isAdmin ? DEFAULT_LOCALE : await getServerLocale();
 
   return (
     <html lang={locale} dir={LOCALE_DIR[locale]} className={`${assistant.variable} h-full antialiased`}>
-      <body className="flex min-h-full flex-col overflow-x-hidden">{children}</body>
+      <body className="flex min-h-full flex-col overflow-x-hidden">
+        <StagingBanner />
+        {children}
+      </body>
     </html>
   );
 }
