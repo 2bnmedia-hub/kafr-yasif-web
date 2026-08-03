@@ -1,24 +1,38 @@
 import { randomBytes } from "crypto";
 import { cookies } from "next/headers";
-import { eq, and, gte, count } from "drizzle-orm";
+import { eq, and, gte, desc } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { db } from "@/db";
 import { adminSessions, adminUsers, loginAttempts } from "@/db/schema";
 
 const SESSION_COOKIE = "admin_session";
-const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 7; // 7 days
+// Sliding idle window: each authenticated request pushes expiresAt forward by this much...
+const SESSION_IDLE_MS = 30 * 60 * 1000; // 30 minutes
+// ...but never past createdAt + this hard cap, regardless of activity.
+const SESSION_MAX_LIFETIME_MS = 8 * 60 * 60 * 1000; // 8 hours
 
-const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
+const RATE_LIMIT_WINDOW_MS = 24 * 60 * 60 * 1000; // rolling 24h window of failed attempts
 const RATE_LIMIT_MAX_ATTEMPTS = 5;
+const LOCKOUT_BASE_MS = 30 * 1000; // 30s lockout starting at the 5th failure
+const LOCKOUT_MAX_MS = 15 * 60 * 1000; // doubles per subsequent failure, capped at 15 min
 
-/** DB-backed (not in-memory) so this actually works across serverless function instances. */
+/** DB-backed (not in-memory) so this actually works across serverless function instances.
+ *  Progressive: the lockout doubles for each failed attempt past the 5th (30s, 1m, 2m, ... 15m
+ *  cap), measured from the most recent failure — not a flat block. */
 export async function isRateLimited(email: string): Promise<boolean> {
   const windowStart = new Date(Date.now() - RATE_LIMIT_WINDOW_MS);
-  const [{ value }] = await db
-    .select({ value: count() })
+  const attempts = await db
+    .select({ createdAt: loginAttempts.createdAt })
     .from(loginAttempts)
-    .where(and(eq(loginAttempts.email, email.toLowerCase()), gte(loginAttempts.createdAt, windowStart)));
-  return value >= RATE_LIMIT_MAX_ATTEMPTS;
+    .where(and(eq(loginAttempts.email, email.toLowerCase()), gte(loginAttempts.createdAt, windowStart)))
+    .orderBy(desc(loginAttempts.createdAt));
+
+  if (attempts.length < RATE_LIMIT_MAX_ATTEMPTS) return false;
+
+  const overage = attempts.length - RATE_LIMIT_MAX_ATTEMPTS;
+  const lockoutMs = Math.min(LOCKOUT_MAX_MS, LOCKOUT_BASE_MS * 2 ** overage);
+  const lockedUntil = new Date(attempts[0].createdAt.getTime() + lockoutMs);
+  return lockedUntil > new Date();
 }
 
 async function recordFailedAttempt(email: string) {
@@ -43,16 +57,17 @@ export async function verifyLogin(email: string, password: string) {
 
 export async function createSession(userId: number) {
   const id = randomBytes(32).toString("hex");
-  const expiresAt = new Date(Date.now() + SESSION_TTL_MS);
+  const now = Date.now();
+  const expiresAt = new Date(now + SESSION_IDLE_MS);
   await db.insert(adminSessions).values({ id, userId, expiresAt });
 
   const cookieStore = await cookies();
   cookieStore.set(SESSION_COOKIE, id, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
+    sameSite: "strict",
     path: "/",
-    expires: expiresAt,
+    expires: new Date(now + SESSION_MAX_LIFETIME_MS),
   });
 }
 
@@ -78,6 +93,20 @@ export async function getCurrentAdmin() {
     .limit(1);
 
   const row = rows[0];
-  if (!row || row.session.expiresAt < new Date()) return null;
+  if (!row) return null;
+
+  const now = Date.now();
+  const hardCap = row.session.createdAt.getTime() + SESSION_MAX_LIFETIME_MS;
+  if (row.session.expiresAt.getTime() < now || now > hardCap) {
+    await db.delete(adminSessions).where(eq(adminSessions.id, sessionId));
+    return null;
+  }
+
+  // Slide the idle window forward, but never past the absolute 8h cap from session creation.
+  const nextExpiry = new Date(Math.min(now + SESSION_IDLE_MS, hardCap));
+  if (nextExpiry.getTime() > row.session.expiresAt.getTime()) {
+    await db.update(adminSessions).set({ expiresAt: nextExpiry }).where(eq(adminSessions.id, sessionId));
+  }
+
   return row.user;
 }
