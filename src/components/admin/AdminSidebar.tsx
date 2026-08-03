@@ -17,7 +17,11 @@ import {
   Rss,
   FileText,
   Users,
+  ShieldCheck,
 } from "lucide-react";
+import type { AdminRole } from "@/lib/permissions";
+
+const SITE_ADMIN_ONLY_HREFS = new Set(["/admin/settings", "/admin/ticker", "/admin/submissions", "/admin/residents", "/admin/users"]);
 
 const NAV_GROUPS = [
   {
@@ -60,11 +64,12 @@ const NAV_GROUPS = [
       { label: "רצועת חדשות", href: "/admin/ticker", icon: Rss },
       { label: "פניות שהתקבלו", href: "/admin/submissions", icon: Inbox },
       { label: "משתמשים רשומים", href: "/admin/residents", icon: Users },
+      { label: "משתמשי מערכת", href: "/admin/users", icon: ShieldCheck },
     ],
   },
 ];
 
-function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
+function NavLinks({ onNavigate, role }: { onNavigate?: () => void; role: AdminRole }) {
   const pathname = usePathname();
   return (
     <div className="space-y-7">
@@ -72,7 +77,9 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
         <div key={group.title}>
           <h2 className="mb-2 px-3 text-[11px] font-bold uppercase tracking-wider text-white/35">{group.title}</h2>
           <ul className="space-y-0.5 text-sm">
-            {group.items.map((item) => {
+            {group.items
+              .filter((item) => role === "site-admin" || !SITE_ADMIN_ONLY_HREFS.has(item.href))
+              .map((item) => {
               const active = pathname === item.href.split("?")[0];
               return (
                 <li key={item.href}>
@@ -103,7 +110,7 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
   );
 }
 
-export function AdminSidebar() {
+export function AdminSidebar({ role }: { role: AdminRole }) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -125,7 +132,7 @@ export function AdminSidebar() {
         aria-label="ניווט ניהול"
         className="admin-sidebar-gradient admin-shadow-raised hidden w-60 shrink-0 self-start rounded-2xl p-4 lg:sticky lg:top-6 lg:block"
       >
-        <NavLinks />
+        <NavLinks role={role} />
       </nav>
 
       {open && (
@@ -138,7 +145,7 @@ export function AdminSidebar() {
                 <X size={18} />
               </button>
             </div>
-            <NavLinks onNavigate={() => setOpen(false)} />
+            <NavLinks onNavigate={() => setOpen(false)} role={role} />
           </div>
         </div>
       )}

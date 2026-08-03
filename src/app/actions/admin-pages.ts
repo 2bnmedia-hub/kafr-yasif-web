@@ -5,14 +5,8 @@ import { eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { db } from "@/db";
 import { pages } from "@/db/schema";
-import { getCurrentAdmin } from "@/lib/auth";
 import { sanitizeRichHtml } from "@/lib/sanitize-html";
-
-async function requireAdmin() {
-  const admin = await getCurrentAdmin();
-  if (!admin) throw new Error("Unauthorized");
-  return admin;
-}
+import { assertContentMutationAllowed, requireCapability } from "@/lib/permissions";
 
 function str(formData: FormData, key: string): string {
   return String(formData.get(key) ?? "").trim();
@@ -28,13 +22,16 @@ function optionalHtml(formData: FormData, key: string): string | null {
 }
 
 export async function updatePageAction(id: number, formData: FormData) {
-  await requireAdmin();
+  const admin = await requireCapability("content:edit");
+
+  const [current] = await db.select({ published: pages.published }).from(pages).where(eq(pages.id, id)).limit(1);
+  const published = formData.get("published") === "on";
+  assertContentMutationAllowed(admin, { currentlyPublished: current?.published ?? false, requestedPublished: published });
 
   const title = str(formData, "title");
   const navLabel = str(formData, "navLabel");
   const bodyHtml = sanitizeRichHtml(str(formData, "bodyHtml"));
   const metaDescription = optionalStr(formData, "metaDescription");
-  const published = formData.get("published") === "on";
 
   const titleAr = optionalStr(formData, "titleAr");
   const titleEn = optionalStr(formData, "titleEn");
@@ -73,7 +70,7 @@ export async function updatePageAction(id: number, formData: FormData) {
 }
 
 export async function deletePageAction(id: number) {
-  await requireAdmin();
+  await requireCapability("content:delete");
   const [deleted] = await db.delete(pages).where(eq(pages.id, id)).returning({ slug: pages.slug });
   if (deleted) revalidatePath(`/${deleted.slug}`);
   revalidatePath("/admin/pages");

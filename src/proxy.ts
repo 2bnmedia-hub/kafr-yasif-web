@@ -1,4 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { eq, and, gt } from "drizzle-orm";
+import { db } from "@/db";
+import { adminSessions } from "@/db/schema";
 
 // Matches the styling of src/app/(public)/not-found.tsx — kept as static markup (not a redirect
 // or rewrite into the app) because a malformed request path crashes Next's own router again if
@@ -37,8 +40,41 @@ const NOT_FOUND_HTML = `<!DOCTYPE html>
  */
 const LEGACY_PATH_REDIRECTS: Record<string, string> = {};
 
-export function proxy(request: NextRequest) {
+/**
+ * Default-deny gate for every /admin and /api/admin path (except the login page/action itself).
+ * This is a network-boundary backstop, not the only check — each server action and route handler
+ * still verifies its own capability (see src/lib/permissions.ts), since Server Actions are POSTs
+ * to their page route and don't get their own proxy matcher entry. What this gate buys is: a new
+ * /admin or /api/admin route that someone forgets to gate individually is still blocked by
+ * default, rather than silently open until someone notices.
+ */
+const ADMIN_LOGIN_PATHS = new Set(["/admin/login"]);
+
+async function hasValidAdminSession(request: NextRequest): Promise<boolean> {
+  const sessionId = request.cookies.get("admin_session")?.value;
+  if (!sessionId) return false;
+  const rows = await db
+    .select({ id: adminSessions.id })
+    .from(adminSessions)
+    .where(and(eq(adminSessions.id, sessionId), gt(adminSessions.expiresAt, new Date())))
+    .limit(1);
+  return rows.length > 0;
+}
+
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  const isAdminArea = pathname.startsWith("/admin") && !ADMIN_LOGIN_PATHS.has(pathname);
+  const isAdminApi = pathname.startsWith("/api/admin");
+  if (isAdminArea || isAdminApi) {
+    const authenticated = await hasValidAdminSession(request);
+    if (!authenticated) {
+      if (isAdminApi) {
+        return NextResponse.json({ error: "לא מורשה. יש להתחבר מחדש." }, { status: 401 });
+      }
+      return NextResponse.redirect(new URL("/admin/login", request.url));
+    }
+  }
 
   const redirectTo = LEGACY_PATH_REDIRECTS[pathname];
   if (redirectTo) {

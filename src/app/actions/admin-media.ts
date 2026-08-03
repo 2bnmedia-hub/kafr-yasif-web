@@ -5,13 +5,8 @@ import { del } from "@vercel/blob";
 import { eq, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { media, pages, news, newsImages, events, eventImages, tenderDocuments, banners } from "@/db/schema";
-import { getCurrentAdmin } from "@/lib/auth";
 import { validateUploadedFile, VALID_KIND_GROUPS, type UploadKind } from "@/lib/upload-validation";
-
-async function requireAdmin() {
-  const admin = await getCurrentAdmin();
-  if (!admin) throw new Error("Unauthorized");
-}
+import { requireCapability } from "@/lib/permissions";
 
 /**
  * Called by UploadWidget right after a file finishes uploading directly to Vercel Blob (client-side,
@@ -24,7 +19,7 @@ export async function finalizeMediaUploadAction(input: {
   group: "image" | "document" | "any";
   sizeBytes: number;
 }): Promise<{ media: typeof media.$inferSelect } | { error: string }> {
-  await requireAdmin();
+  await requireCapability("media:upload");
 
   const allowedKinds: UploadKind[] = VALID_KIND_GROUPS[input.group] ?? VALID_KIND_GROUPS.any;
 
@@ -76,6 +71,7 @@ export async function finalizeMediaUploadAction(input: {
 
 /** Finds every place a given media row is referenced, across all content tables. */
 export async function getMediaUsage(mediaId: number, mediaUrl: string) {
+  await requireCapability("content:edit"); // exported "use server" action — needs its own gate, not just the deleteMediaAction caller's
   const usages: string[] = [];
 
   const pageRows = await db.select({ title: pages.title }).from(pages).where(sql`${pages.images} @> ${JSON.stringify([mediaUrl])}::jsonb`);
@@ -119,7 +115,7 @@ export async function getMediaUsage(mediaId: number, mediaUrl: string) {
 }
 
 export async function deleteMediaAction(mediaId: number) {
-  await requireAdmin();
+  await requireCapability("content:delete");
   const [row] = await db.select().from(media).where(eq(media.id, mediaId)).limit(1);
   if (!row) return { error: "הקובץ לא נמצא." };
 

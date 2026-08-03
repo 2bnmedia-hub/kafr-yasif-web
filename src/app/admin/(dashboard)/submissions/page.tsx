@@ -1,6 +1,7 @@
 import { db } from "@/db";
 import { formSubmissions } from "@/db/schema";
 import { desc } from "drizzle-orm";
+import { requireCapabilityOrRedirect } from "@/lib/permissions";
 
 type Attachment = { pathname: string; originalName: string; mimeType: string; sizeBytes: number };
 
@@ -9,6 +10,7 @@ function isAttachment(value: unknown): value is Attachment {
 }
 
 export default async function AdminSubmissionsPage() {
+  await requireCapabilityOrRedirect("submissions:view");
   const rows = await db.select().from(formSubmissions).orderBy(desc(formSubmissions.createdAt));
 
   return (

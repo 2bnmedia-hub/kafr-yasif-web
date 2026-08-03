@@ -5,14 +5,9 @@ import { redirect } from "next/navigation";
 import { eq, and, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { news, newsImages } from "@/db/schema";
-import { getCurrentAdmin } from "@/lib/auth";
 import { sanitizeRichHtml } from "@/lib/sanitize-html";
 import { uniqueSlug } from "@/lib/slugify";
-
-async function requireAdmin() {
-  const admin = await getCurrentAdmin();
-  if (!admin) throw new Error("Unauthorized");
-}
+import { assertContentMutationAllowed, requireCapability } from "@/lib/permissions";
 
 function afterNewsChange() {
   revalidatePath("/");
@@ -21,7 +16,7 @@ function afterNewsChange() {
 }
 
 export async function reorderNewsAction(orderedIds: number[]) {
-  await requireAdmin();
+  await requireCapability("content:edit");
   await Promise.all(orderedIds.map((id, position) => db.update(news).set({ sortOrder: position }).where(eq(news.id, id))));
   afterNewsChange();
 }
@@ -87,8 +82,9 @@ function parsePendingGalleryItems(formData: FormData): PendingGalleryItem[] {
 }
 
 export async function createNewsAction(formData: FormData) {
-  await requireAdmin();
+  const admin = await requireCapability("content:edit");
   const fields = await newsFieldsFromForm(formData);
+  assertContentMutationAllowed(admin, { currentlyPublished: false, requestedPublished: fields.status === "published" });
   const existing = await db.select({ slug: news.slug }).from(news);
   const slug = uniqueSlug(fields.title, new Set(existing.map((r) => r.slug)));
 
@@ -116,8 +112,13 @@ export async function createNewsAction(formData: FormData) {
 }
 
 export async function updateNewsAction(id: number, formData: FormData) {
-  await requireAdmin();
+  const admin = await requireCapability("content:edit");
   const fields = await newsFieldsFromForm(formData);
+  const [current] = await db.select({ published: news.published }).from(news).where(eq(news.id, id)).limit(1);
+  assertContentMutationAllowed(admin, {
+    currentlyPublished: current?.published ?? false,
+    requestedPublished: fields.status === "published",
+  });
   const [updated] = await db
     .update(news)
     .set({ ...fields, published: fields.status === "published" })
@@ -130,14 +131,14 @@ export async function updateNewsAction(id: number, formData: FormData) {
 }
 
 export async function deleteNewsAction(id: number) {
-  await requireAdmin();
+  await requireCapability("content:delete");
   await db.delete(news).where(eq(news.id, id));
   afterNewsChange();
   redirect("/admin/news");
 }
 
 export async function togglePublishNewsAction(id: number, nextStatus: "published" | "hidden") {
-  await requireAdmin();
+  await requireCapability("content:publish");
   await db
     .update(news)
     .set({ status: nextStatus, published: nextStatus === "published" })
@@ -147,7 +148,7 @@ export async function togglePublishNewsAction(id: number, nextStatus: "published
 }
 
 export async function duplicateNewsAction(id: number) {
-  await requireAdmin();
+  await requireCapability("content:edit"); // always creates a new draft, never publishes
   const [source] = await db.select().from(news).where(eq(news.id, id)).limit(1);
   if (!source) redirect("/admin/news");
 
@@ -195,7 +196,7 @@ export async function duplicateNewsAction(id: number) {
 }
 
 export async function addNewsImageAction(formData: FormData) {
-  await requireAdmin();
+  await requireCapability("content:edit");
   const newsId = Number(formData.get("newsId"));
   const mediaId = Number(formData.get("mediaId"));
   const alt = str(formData, "alt");
@@ -222,21 +223,21 @@ export async function addNewsImageAction(formData: FormData) {
 }
 
 export async function deleteNewsImageAction(newsId: number, imageId: number) {
-  await requireAdmin();
+  await requireCapability("content:edit");
   await db.delete(newsImages).where(and(eq(newsImages.id, imageId), eq(newsImages.newsId, newsId)));
   afterNewsChange();
   revalidatePath(`/admin/news/${newsId}`);
 }
 
 export async function setCoverImageAction(newsId: number, mediaId: number) {
-  await requireAdmin();
+  await requireCapability("content:edit");
   await db.update(news).set({ coverImageId: mediaId }).where(eq(news.id, newsId));
   afterNewsChange();
   revalidatePath(`/admin/news/${newsId}`);
 }
 
 export async function reorderNewsImageAction(newsId: number, imageId: number, direction: "up" | "down") {
-  await requireAdmin();
+  await requireCapability("content:edit");
   const images = await db.select().from(newsImages).where(eq(newsImages.newsId, newsId)).orderBy(newsImages.sortOrder);
   const idx = images.findIndex((i) => i.id === imageId);
   const swapWith = direction === "up" ? idx - 1 : idx + 1;

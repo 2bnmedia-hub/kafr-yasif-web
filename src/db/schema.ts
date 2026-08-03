@@ -21,6 +21,11 @@ export const navSectionEnum = pgEnum("nav_section", [
 
 export const mediaKindEnum = pgEnum("media_kind", ["image", "pdf", "document", "video", "icon"]);
 
+/** מנהל אתר (full access, incl. publishing/deleting/user management/public inquiries) vs
+ *  עורך תוכן (create/edit content as drafts only — cannot publish, delete, or see resident
+ *  submissions). See src/lib/permissions.ts for the enforced capability matrix. */
+export const adminRoleEnum = pgEnum("admin_role", ["site-admin", "content-editor"]);
+
 /** Shared publish-workflow status used by tenders, news, and events. */
 export const contentStatusEnum = pgEnum("content_status", ["draft", "published", "hidden", "scheduled"]);
 
@@ -313,6 +318,14 @@ export const adminUsers = pgTable("admin_users", {
   id: serial("id").primaryKey(),
   email: varchar("email", { length: 255 }).notNull().unique(),
   passwordHash: text("password_hash").notNull(),
+  // Least-privilege default: a row inserted without an explicit role (there should never be
+  // one — see the invite flow in src/app/actions/admin-users.ts) gets the lower-access role
+  // rather than silently becoming a site-admin.
+  // Physical column is "access_role", not "role": the live DB already has an undocumented
+  // "role" (varchar) + "permissions" (jsonb) pair on this table that predates this codebase's
+  // git history and isn't read by any app code found — left untouched pending investigation
+  // (see docs/handover-cio.md open items) rather than colliding with or overwriting it.
+  role: adminRoleEnum("access_role").notNull().default("content-editor"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

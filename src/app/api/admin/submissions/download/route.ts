@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { get } from "@vercel/blob";
+import { roleCan } from "@/lib/permissions";
 import { getCurrentAdmin } from "@/lib/auth";
 
 export const runtime = "nodejs";
@@ -18,6 +19,9 @@ export async function GET(request: Request) {
   const admin = await getCurrentAdmin();
   if (!admin) {
     return NextResponse.json({ error: "לא מורשה. יש להתחבר מחדש." }, { status: 401 });
+  }
+  if (!roleCan(admin.role, "submissions:view")) {
+    return NextResponse.json({ error: "אין הרשאה לצפות בפניות הציבור." }, { status: 403 });
   }
 
   const pathname = new URL(request.url).searchParams.get("pathname");

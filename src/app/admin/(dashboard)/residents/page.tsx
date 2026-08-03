@@ -1,8 +1,12 @@
 import { db } from "@/db";
 import { residents } from "@/db/schema";
 import { desc } from "drizzle-orm";
+import { requireCapabilityOrRedirect } from "@/lib/permissions";
 
 export default async function AdminResidentsPage() {
+  // Resident names/emails are personal data, same category as public inquiries — not something
+  // a content-editor should see just because they can log into /admin.
+  await requireCapabilityOrRedirect("submissions:view");
   const rows = await db.select().from(residents).orderBy(desc(residents.createdAt));
 
   return (

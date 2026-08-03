@@ -5,14 +5,9 @@ import { redirect } from "next/navigation";
 import { eq, and, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { tenders, tenderDocuments } from "@/db/schema";
-import { getCurrentAdmin } from "@/lib/auth";
 import { sanitizeRichHtml } from "@/lib/sanitize-html";
 import { uniqueSlug } from "@/lib/slugify";
-
-async function requireAdmin() {
-  const admin = await getCurrentAdmin();
-  if (!admin) throw new Error("Unauthorized");
-}
+import { assertContentMutationAllowed, requireCapability } from "@/lib/permissions";
 
 function afterTendersChange() {
   revalidatePath("/מכרזים");
@@ -20,7 +15,7 @@ function afterTendersChange() {
 }
 
 export async function reorderTendersAction(orderedIds: number[]) {
-  await requireAdmin();
+  await requireCapability("content:edit");
   await Promise.all(orderedIds.map((id, position) => db.update(tenders).set({ sortOrder: position }).where(eq(tenders.id, id))));
   afterTendersChange();
 }
@@ -90,8 +85,9 @@ function parsePendingDocuments(formData: FormData): PendingDocument[] {
 }
 
 export async function createTenderAction(formData: FormData) {
-  await requireAdmin();
+  const admin = await requireCapability("content:edit");
   const fields = await tenderFieldsFromForm(formData);
+  assertContentMutationAllowed(admin, { currentlyPublished: false, requestedPublished: fields.status === "published" });
 
   const existing = await db.select({ slug: tenders.slug }).from(tenders);
   const slug = uniqueSlug(fields.title, new Set(existing.map((r) => r.slug)));
@@ -117,8 +113,13 @@ export async function createTenderAction(formData: FormData) {
 }
 
 export async function updateTenderAction(id: number, formData: FormData) {
-  await requireAdmin();
+  const admin = await requireCapability("content:edit");
   const fields = await tenderFieldsFromForm(formData);
+  const [current] = await db.select({ status: tenders.status }).from(tenders).where(eq(tenders.id, id)).limit(1);
+  assertContentMutationAllowed(admin, {
+    currentlyPublished: current?.status === "published",
+    requestedPublished: fields.status === "published",
+  });
   await db.update(tenders).set({ ...fields, updatedAt: new Date() }).where(eq(tenders.id, id));
   afterTendersChange();
   revalidatePath(`/tenders/${(await db.select({ slug: tenders.slug }).from(tenders).where(eq(tenders.id, id)))[0]?.slug}`);
@@ -127,21 +128,21 @@ export async function updateTenderAction(id: number, formData: FormData) {
 }
 
 export async function deleteTenderAction(id: number) {
-  await requireAdmin();
+  await requireCapability("content:delete");
   await db.delete(tenders).where(eq(tenders.id, id));
   afterTendersChange();
   redirect("/admin/tenders");
 }
 
 export async function togglePublishTenderAction(id: number, nextStatus: "published" | "hidden") {
-  await requireAdmin();
+  await requireCapability("content:publish");
   await db.update(tenders).set({ status: nextStatus, updatedAt: new Date() }).where(eq(tenders.id, id));
   afterTendersChange();
   revalidatePath(`/admin/tenders/${id}`);
 }
 
 export async function duplicateTenderAction(id: number) {
-  await requireAdmin();
+  await requireCapability("content:edit"); // always creates a new draft, never publishes
   const [source] = await db.select().from(tenders).where(eq(tenders.id, id)).limit(1);
   if (!source) redirect("/admin/tenders");
 
@@ -194,7 +195,7 @@ export async function duplicateTenderAction(id: number) {
 }
 
 export async function addTenderDocumentAction(formData: FormData) {
-  await requireAdmin();
+  await requireCapability("content:edit");
   const tenderId = Number(formData.get("tenderId"));
   const mediaId = Number(formData.get("mediaId"));
   const name = str(formData, "name");
@@ -224,14 +225,14 @@ export async function addTenderDocumentAction(formData: FormData) {
 }
 
 export async function setTenderCoverImageAction(tenderId: number, mediaId: number) {
-  await requireAdmin();
+  await requireCapability("content:edit");
   await db.update(tenders).set({ coverImageId: mediaId }).where(eq(tenders.id, tenderId));
   afterTendersChange();
   revalidatePath(`/admin/tenders/${tenderId}`);
 }
 
 export async function deleteTenderDocumentAction(tenderId: number, docId: number) {
-  await requireAdmin();
+  await requireCapability("content:edit");
   await db.delete(tenderDocuments).where(and(eq(tenderDocuments.id, docId), eq(tenderDocuments.tenderId, tenderId)));
   afterTendersChange();
   revalidatePath(`/admin/tenders/${tenderId}`);

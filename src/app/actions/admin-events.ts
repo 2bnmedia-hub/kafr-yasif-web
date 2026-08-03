@@ -5,14 +5,9 @@ import { redirect } from "next/navigation";
 import { eq, and, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { events, eventImages } from "@/db/schema";
-import { getCurrentAdmin } from "@/lib/auth";
 import { sanitizeRichHtml } from "@/lib/sanitize-html";
 import { uniqueSlug } from "@/lib/slugify";
-
-async function requireAdmin() {
-  const admin = await getCurrentAdmin();
-  if (!admin) throw new Error("Unauthorized");
-}
+import { assertContentMutationAllowed, requireCapability } from "@/lib/permissions";
 
 function afterEventsChange() {
   revalidatePath("/");
@@ -21,7 +16,7 @@ function afterEventsChange() {
 }
 
 export async function reorderEventsAction(orderedIds: number[]) {
-  await requireAdmin();
+  await requireCapability("content:edit");
   await Promise.all(orderedIds.map((id, position) => db.update(events).set({ sortOrder: position }).where(eq(events.id, id))));
   afterEventsChange();
 }
@@ -93,8 +88,9 @@ async function eventFieldsFromForm(formData: FormData) {
 }
 
 export async function createEventAction(formData: FormData) {
-  await requireAdmin();
+  const admin = await requireCapability("content:edit");
   const fields = await eventFieldsFromForm(formData);
+  assertContentMutationAllowed(admin, { currentlyPublished: false, requestedPublished: fields.status === "published" });
   const existing = await db.select({ slug: events.slug }).from(events);
   const slug = uniqueSlug(fields.title, new Set(existing.map((r) => r.slug).filter((s): s is string => !!s)));
 
@@ -108,8 +104,13 @@ export async function createEventAction(formData: FormData) {
 }
 
 export async function updateEventAction(id: number, formData: FormData) {
-  await requireAdmin();
+  const admin = await requireCapability("content:edit");
   const fields = await eventFieldsFromForm(formData);
+  const [current] = await db.select({ published: events.published }).from(events).where(eq(events.id, id)).limit(1);
+  assertContentMutationAllowed(admin, {
+    currentlyPublished: current?.published ?? false,
+    requestedPublished: fields.status === "published",
+  });
   const [updated] = await db
     .update(events)
     .set({ ...fields, published: fields.status === "published" })
@@ -122,14 +123,14 @@ export async function updateEventAction(id: number, formData: FormData) {
 }
 
 export async function deleteEventAction(id: number) {
-  await requireAdmin();
+  await requireCapability("content:delete");
   await db.delete(events).where(eq(events.id, id));
   afterEventsChange();
   redirect("/admin/events");
 }
 
 export async function togglePublishEventAction(id: number, nextStatus: "published" | "hidden") {
-  await requireAdmin();
+  await requireCapability("content:publish");
   await db
     .update(events)
     .set({ status: nextStatus, published: nextStatus === "published" })
@@ -139,7 +140,7 @@ export async function togglePublishEventAction(id: number, nextStatus: "publishe
 }
 
 export async function duplicateEventAction(id: number) {
-  await requireAdmin();
+  await requireCapability("content:edit"); // always creates a new draft, never publishes
   const [source] = await db.select().from(events).where(eq(events.id, id)).limit(1);
   if (!source) redirect("/admin/events");
 
@@ -199,7 +200,7 @@ export async function duplicateEventAction(id: number) {
 }
 
 export async function addEventImageAction(formData: FormData) {
-  await requireAdmin();
+  await requireCapability("content:edit");
   const eventId = Number(formData.get("eventId"));
   const mediaId = Number(formData.get("mediaId"));
   const alt = str(formData, "alt");
@@ -216,21 +217,21 @@ export async function addEventImageAction(formData: FormData) {
 }
 
 export async function deleteEventImageAction(eventId: number, imageId: number) {
-  await requireAdmin();
+  await requireCapability("content:edit");
   await db.delete(eventImages).where(and(eq(eventImages.id, imageId), eq(eventImages.eventId, eventId)));
   afterEventsChange();
   revalidatePath(`/admin/events/${eventId}`);
 }
 
 export async function setEventCoverImageAction(eventId: number, mediaId: number) {
-  await requireAdmin();
+  await requireCapability("content:edit");
   await db.update(events).set({ imageId: mediaId }).where(eq(events.id, eventId));
   afterEventsChange();
   revalidatePath(`/admin/events/${eventId}`);
 }
 
 export async function reorderEventImageAction(eventId: number, imageId: number, direction: "up" | "down") {
-  await requireAdmin();
+  await requireCapability("content:edit");
   const images = await db.select().from(eventImages).where(eq(eventImages.eventId, eventId)).orderBy(eventImages.sortOrder);
   const idx = images.findIndex((i) => i.id === imageId);
   const swapWith = direction === "up" ? idx - 1 : idx + 1;

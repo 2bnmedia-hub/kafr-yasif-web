@@ -4,12 +4,11 @@ import { revalidatePath } from "next/cache";
 import { eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { tickerItems } from "@/db/schema";
-import { getCurrentAdmin } from "@/lib/auth";
+import { requireCapability } from "@/lib/permissions";
 
-async function requireAdmin() {
-  const admin = await getCurrentAdmin();
-  if (!admin) throw new Error("Unauthorized");
-}
+// Ticker items go live immediately on creation (no draft state) and are the site's breaking-news/
+// emergency-notice mechanism — treated as "settings:manage" (site-admin only), not regular
+// content, matching the emergency-notices row in the capability table.
 
 function afterTickerChange() {
   revalidatePath("/");
@@ -21,7 +20,7 @@ function str(formData: FormData, key: string): string {
 }
 
 export async function createTickerItemAction(formData: FormData) {
-  await requireAdmin();
+  await requireCapability("settings:manage");
   const text = str(formData, "text");
   const href = str(formData, "href") || null;
   if (!text) return;
@@ -32,7 +31,7 @@ export async function createTickerItemAction(formData: FormData) {
 }
 
 export async function updateTickerItemAction(id: number, formData: FormData) {
-  await requireAdmin();
+  await requireCapability("settings:manage");
   const text = str(formData, "text");
   const href = str(formData, "href") || null;
   const active = formData.get("active") === "on";
@@ -43,13 +42,13 @@ export async function updateTickerItemAction(id: number, formData: FormData) {
 }
 
 export async function deleteTickerItemAction(id: number) {
-  await requireAdmin();
+  await requireCapability("settings:manage");
   await db.delete(tickerItems).where(eq(tickerItems.id, id));
   afterTickerChange();
 }
 
 export async function reorderTickerItemsAction(orderedIds: number[]) {
-  await requireAdmin();
+  await requireCapability("settings:manage");
   await Promise.all(orderedIds.map((id, position) => db.update(tickerItems).set({ sortOrder: position }).where(eq(tickerItems.id, id))));
   afterTickerChange();
 }
