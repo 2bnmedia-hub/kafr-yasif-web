@@ -8,6 +8,7 @@ import { tenders, tenderDocuments } from "@/db/schema";
 import { sanitizeRichHtml } from "@/lib/sanitize-html";
 import { uniqueSlug } from "@/lib/slugify";
 import { assertContentMutationAllowed, requireCapability } from "@/lib/permissions";
+import { logAuditEvent } from "@/lib/audit-log";
 
 function afterTendersChange() {
   revalidatePath("/מכרזים");
@@ -109,6 +110,10 @@ export async function createTenderAction(formData: FormData) {
 
   afterTendersChange();
   revalidatePath(`/tenders/${slug}`);
+  await logAuditEvent({ action: "content_create", actorAdminId: admin.id, actorEmail: admin.email, targetType: "tenders", targetId: row.id, detail: { slug } });
+  if (fields.status === "published") {
+    await logAuditEvent({ action: "content_publish", actorAdminId: admin.id, actorEmail: admin.email, targetType: "tenders", targetId: row.id });
+  }
   redirect(`/admin/tenders/${row.id}?status=${fields.status === "published" ? "created" : "created_draft"}`);
 }
 
@@ -124,25 +129,43 @@ export async function updateTenderAction(id: number, formData: FormData) {
   afterTendersChange();
   revalidatePath(`/tenders/${(await db.select({ slug: tenders.slug }).from(tenders).where(eq(tenders.id, id)))[0]?.slug}`);
   revalidatePath(`/admin/tenders/${id}`);
+  await logAuditEvent({ action: "content_update", actorAdminId: admin.id, actorEmail: admin.email, targetType: "tenders", targetId: id });
+  if (current && current.status !== fields.status && (current.status === "published" || fields.status === "published")) {
+    await logAuditEvent({
+      action: fields.status === "published" ? "content_publish" : "content_unpublish",
+      actorAdminId: admin.id,
+      actorEmail: admin.email,
+      targetType: "tenders",
+      targetId: id,
+    });
+  }
   redirect(`/admin/tenders/${id}?status=${fields.status === "published" ? "saved" : "saved_draft"}`);
 }
 
 export async function deleteTenderAction(id: number) {
-  await requireCapability("content:delete");
+  const admin = await requireCapability("content:delete");
   await db.delete(tenders).where(eq(tenders.id, id));
   afterTendersChange();
+  await logAuditEvent({ action: "content_delete", actorAdminId: admin.id, actorEmail: admin.email, targetType: "tenders", targetId: id });
   redirect("/admin/tenders");
 }
 
 export async function togglePublishTenderAction(id: number, nextStatus: "published" | "hidden") {
-  await requireCapability("content:publish");
+  const admin = await requireCapability("content:publish");
   await db.update(tenders).set({ status: nextStatus, updatedAt: new Date() }).where(eq(tenders.id, id));
   afterTendersChange();
+  await logAuditEvent({
+    action: nextStatus === "published" ? "content_publish" : "content_unpublish",
+    actorAdminId: admin.id,
+    actorEmail: admin.email,
+    targetType: "tenders",
+    targetId: id,
+  });
   revalidatePath(`/admin/tenders/${id}`);
 }
 
 export async function duplicateTenderAction(id: number) {
-  await requireCapability("content:edit"); // always creates a new draft, never publishes
+  const admin = await requireCapability("content:edit"); // always creates a new draft, never publishes
   const [source] = await db.select().from(tenders).where(eq(tenders.id, id)).limit(1);
   if (!source) redirect("/admin/tenders");
 
@@ -191,6 +214,7 @@ export async function duplicateTenderAction(id: number) {
   }
 
   afterTendersChange();
+  await logAuditEvent({ action: "content_create", actorAdminId: admin.id, actorEmail: admin.email, targetType: "tenders", targetId: copy.id, detail: { duplicatedFrom: id } });
   redirect(`/admin/tenders/${copy.id}`);
 }
 

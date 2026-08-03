@@ -7,6 +7,7 @@ import { db } from "@/db";
 import { pages } from "@/db/schema";
 import { sanitizeRichHtml } from "@/lib/sanitize-html";
 import { assertContentMutationAllowed, requireCapability } from "@/lib/permissions";
+import { logAuditEvent } from "@/lib/audit-log";
 
 function str(formData: FormData, key: string): string {
   return String(formData.get(key) ?? "").trim();
@@ -66,13 +67,24 @@ export async function updatePageAction(id: number, formData: FormData) {
   if (updated) {
     revalidatePath(`/${updated.slug}`);
   }
+  await logAuditEvent({ action: "content_update", actorAdminId: admin.id, actorEmail: admin.email, targetType: "pages", targetId: id });
+  if (current && current.published !== published) {
+    await logAuditEvent({
+      action: published ? "content_publish" : "content_unpublish",
+      actorAdminId: admin.id,
+      actorEmail: admin.email,
+      targetType: "pages",
+      targetId: id,
+    });
+  }
   revalidatePath("/admin/pages");
 }
 
 export async function deletePageAction(id: number) {
-  await requireCapability("content:delete");
+  const admin = await requireCapability("content:delete");
   const [deleted] = await db.delete(pages).where(eq(pages.id, id)).returning({ slug: pages.slug });
   if (deleted) revalidatePath(`/${deleted.slug}`);
+  await logAuditEvent({ action: "content_delete", actorAdminId: admin.id, actorEmail: admin.email, targetType: "pages", targetId: id, detail: { slug: deleted?.slug } });
   revalidatePath("/admin/pages");
   redirect("/admin/pages");
 }

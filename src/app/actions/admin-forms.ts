@@ -6,6 +6,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { forms } from "@/db/schema";
 import { requireCapability } from "@/lib/permissions";
+import { logAuditEvent } from "@/lib/audit-log";
 
 function afterFormsChange() {
   revalidatePath("/");
@@ -40,18 +41,19 @@ export async function reorderFormsAction(orderedIds: number[]) {
 }
 
 export async function createFormAction(formData: FormData) {
-  await requireCapability("content:edit");
+  const admin = await requireCapability("content:edit");
   const fields = formFieldsFromForm(formData);
   if (!fields.title) throw new Error("שם הטופס הוא שדה חובה.");
   if (!fields.mediaId && !fields.externalUrl) throw new Error("יש להעלות קובץ או להזין קישור חיצוני.");
 
   const [row] = await db.insert(forms).values(fields).returning();
   afterFormsChange();
+  await logAuditEvent({ action: "content_create", actorAdminId: admin.id, actorEmail: admin.email, targetType: "forms", targetId: row.id });
   redirect(`/admin/forms/${row.id}?status=created`);
 }
 
 export async function updateFormAction(id: number, formData: FormData) {
-  await requireCapability("content:edit");
+  const admin = await requireCapability("content:edit");
   const fields = formFieldsFromForm(formData);
   if (!fields.title) throw new Error("שם הטופס הוא שדה חובה.");
   if (!fields.mediaId && !fields.externalUrl) throw new Error("יש להעלות קובץ או להזין קישור חיצוני.");
@@ -59,12 +61,14 @@ export async function updateFormAction(id: number, formData: FormData) {
   await db.update(forms).set(fields).where(eq(forms.id, id));
   afterFormsChange();
   revalidatePath(`/admin/forms/${id}`);
+  await logAuditEvent({ action: "content_update", actorAdminId: admin.id, actorEmail: admin.email, targetType: "forms", targetId: id });
   redirect(`/admin/forms/${id}?status=saved`);
 }
 
 export async function deleteFormAction(id: number) {
-  await requireCapability("content:delete");
+  const admin = await requireCapability("content:delete");
   await db.delete(forms).where(eq(forms.id, id));
   afterFormsChange();
+  await logAuditEvent({ action: "content_delete", actorAdminId: admin.id, actorEmail: admin.email, targetType: "forms", targetId: id });
   redirect("/admin/forms");
 }

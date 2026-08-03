@@ -7,6 +7,7 @@ import { db } from "@/db";
 import { media, pages, news, newsImages, events, eventImages, tenderDocuments, banners } from "@/db/schema";
 import { validateUploadedFile, VALID_KIND_GROUPS, type UploadKind } from "@/lib/upload-validation";
 import { requireCapability } from "@/lib/permissions";
+import { logAuditEvent } from "@/lib/audit-log";
 
 /**
  * Called by UploadWidget right after a file finishes uploading directly to Vercel Blob (client-side,
@@ -19,7 +20,7 @@ export async function finalizeMediaUploadAction(input: {
   group: "image" | "document" | "any";
   sizeBytes: number;
 }): Promise<{ media: typeof media.$inferSelect } | { error: string }> {
-  await requireCapability("media:upload");
+  const admin = await requireCapability("media:upload");
 
   const allowedKinds: UploadKind[] = VALID_KIND_GROUPS[input.group] ?? VALID_KIND_GROUPS.any;
 
@@ -66,6 +67,7 @@ export async function finalizeMediaUploadAction(input: {
     })
     .returning();
 
+  await logAuditEvent({ action: "content_create", actorAdminId: admin.id, actorEmail: admin.email, targetType: "media", targetId: row.id, detail: { filename: input.filename } });
   return { media: row };
 }
 
@@ -115,7 +117,7 @@ export async function getMediaUsage(mediaId: number, mediaUrl: string) {
 }
 
 export async function deleteMediaAction(mediaId: number) {
-  await requireCapability("content:delete");
+  const admin = await requireCapability("content:delete");
   const [row] = await db.select().from(media).where(eq(media.id, mediaId)).limit(1);
   if (!row) return { error: "הקובץ לא נמצא." };
 
@@ -130,6 +132,7 @@ export async function deleteMediaAction(mediaId: number) {
     // Already gone from storage — proceed with removing the DB record regardless.
   }
   await db.delete(media).where(eq(media.id, mediaId));
+  await logAuditEvent({ action: "content_delete", actorAdminId: admin.id, actorEmail: admin.email, targetType: "media", targetId: mediaId, detail: { filename: row.filename } });
   revalidatePath("/admin/media");
   return { ok: true };
 }

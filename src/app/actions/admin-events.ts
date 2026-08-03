@@ -8,6 +8,7 @@ import { events, eventImages } from "@/db/schema";
 import { sanitizeRichHtml } from "@/lib/sanitize-html";
 import { uniqueSlug } from "@/lib/slugify";
 import { assertContentMutationAllowed, requireCapability } from "@/lib/permissions";
+import { logAuditEvent } from "@/lib/audit-log";
 
 function afterEventsChange() {
   revalidatePath("/");
@@ -100,6 +101,10 @@ export async function createEventAction(formData: FormData) {
     .returning();
   afterEventsChange();
   revalidatePath(`/events/${slug}`);
+  await logAuditEvent({ action: "content_create", actorAdminId: admin.id, actorEmail: admin.email, targetType: "events", targetId: row.id, detail: { slug } });
+  if (fields.status === "published") {
+    await logAuditEvent({ action: "content_publish", actorAdminId: admin.id, actorEmail: admin.email, targetType: "events", targetId: row.id });
+  }
   redirect(`/admin/events/${row.id}?status=${fields.status === "published" ? "created" : "created_draft"}`);
 }
 
@@ -119,28 +124,46 @@ export async function updateEventAction(id: number, formData: FormData) {
   afterEventsChange();
   if (updated?.slug) revalidatePath(`/events/${updated.slug}`);
   revalidatePath(`/admin/events/${id}`);
+  await logAuditEvent({ action: "content_update", actorAdminId: admin.id, actorEmail: admin.email, targetType: "events", targetId: id });
+  if (current && current.published !== (fields.status === "published")) {
+    await logAuditEvent({
+      action: fields.status === "published" ? "content_publish" : "content_unpublish",
+      actorAdminId: admin.id,
+      actorEmail: admin.email,
+      targetType: "events",
+      targetId: id,
+    });
+  }
   redirect(`/admin/events/${id}?status=${fields.status === "published" ? "saved" : "saved_draft"}`);
 }
 
 export async function deleteEventAction(id: number) {
-  await requireCapability("content:delete");
+  const admin = await requireCapability("content:delete");
   await db.delete(events).where(eq(events.id, id));
   afterEventsChange();
+  await logAuditEvent({ action: "content_delete", actorAdminId: admin.id, actorEmail: admin.email, targetType: "events", targetId: id });
   redirect("/admin/events");
 }
 
 export async function togglePublishEventAction(id: number, nextStatus: "published" | "hidden") {
-  await requireCapability("content:publish");
+  const admin = await requireCapability("content:publish");
   await db
     .update(events)
     .set({ status: nextStatus, published: nextStatus === "published" })
     .where(eq(events.id, id));
   afterEventsChange();
+  await logAuditEvent({
+    action: nextStatus === "published" ? "content_publish" : "content_unpublish",
+    actorAdminId: admin.id,
+    actorEmail: admin.email,
+    targetType: "events",
+    targetId: id,
+  });
   revalidatePath(`/admin/events/${id}`);
 }
 
 export async function duplicateEventAction(id: number) {
-  await requireCapability("content:edit"); // always creates a new draft, never publishes
+  const admin = await requireCapability("content:edit"); // always creates a new draft, never publishes
   const [source] = await db.select().from(events).where(eq(events.id, id)).limit(1);
   if (!source) redirect("/admin/events");
 
@@ -196,6 +219,7 @@ export async function duplicateEventAction(id: number) {
   }
 
   afterEventsChange();
+  await logAuditEvent({ action: "content_create", actorAdminId: admin.id, actorEmail: admin.email, targetType: "events", targetId: copy.id, detail: { duplicatedFrom: id } });
   redirect(`/admin/events/${copy.id}`);
 }
 

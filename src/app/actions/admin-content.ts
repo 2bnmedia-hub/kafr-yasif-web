@@ -5,6 +5,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { siteSettings, footerLinks } from "@/db/schema";
 import { requireCapability } from "@/lib/permissions";
+import { logAuditEvent } from "@/lib/audit-log";
 
 function afterHomepageChange() {
   revalidatePath("/");
@@ -12,7 +13,7 @@ function afterHomepageChange() {
 
 // ---- Site settings ----
 export async function updateSiteSettingsAction(formData: FormData) {
-  await requireCapability("settings:manage");
+  const admin = await requireCapability("settings:manage");
   const dayNames = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
   const hours = dayNames.map((days) => ({
     days,
@@ -30,25 +31,31 @@ export async function updateSiteSettingsAction(formData: FormData) {
     })
     .where(eq(siteSettings.id, 1));
   afterHomepageChange();
+  await logAuditEvent({ action: "content_update", actorAdminId: admin.id, actorEmail: admin.email, targetType: "site_settings", targetId: 1 });
   revalidatePath("/admin/settings");
 }
 
 // ---- Footer links ----
 export async function createFooterLinkAction(formData: FormData) {
-  await requireCapability("content:edit");
-  await db.insert(footerLinks).values({
-    columnTitle: String(formData.get("columnTitle") ?? ""),
-    label: String(formData.get("label") ?? ""),
-    href: String(formData.get("href") ?? ""),
-    sortOrder: Number(formData.get("sortOrder") ?? 0),
-  });
+  const admin = await requireCapability("content:edit");
+  const [row] = await db
+    .insert(footerLinks)
+    .values({
+      columnTitle: String(formData.get("columnTitle") ?? ""),
+      label: String(formData.get("label") ?? ""),
+      href: String(formData.get("href") ?? ""),
+      sortOrder: Number(formData.get("sortOrder") ?? 0),
+    })
+    .returning({ id: footerLinks.id });
   afterHomepageChange();
+  await logAuditEvent({ action: "content_create", actorAdminId: admin.id, actorEmail: admin.email, targetType: "footer_links", targetId: row.id });
   revalidatePath("/admin/footer");
 }
 
 export async function deleteFooterLinkAction(id: number) {
-  await requireCapability("content:delete");
+  const admin = await requireCapability("content:delete");
   await db.delete(footerLinks).where(eq(footerLinks.id, id));
   afterHomepageChange();
+  await logAuditEvent({ action: "content_delete", actorAdminId: admin.id, actorEmail: admin.email, targetType: "footer_links", targetId: id });
   revalidatePath("/admin/footer");
 }

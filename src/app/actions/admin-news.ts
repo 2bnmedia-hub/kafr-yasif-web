@@ -8,6 +8,7 @@ import { news, newsImages } from "@/db/schema";
 import { sanitizeRichHtml } from "@/lib/sanitize-html";
 import { uniqueSlug } from "@/lib/slugify";
 import { assertContentMutationAllowed, requireCapability } from "@/lib/permissions";
+import { logAuditEvent } from "@/lib/audit-log";
 
 function afterNewsChange() {
   revalidatePath("/");
@@ -108,6 +109,10 @@ export async function createNewsAction(formData: FormData) {
 
   afterNewsChange();
   revalidatePath(`/news/${slug}`);
+  await logAuditEvent({ action: "content_create", actorAdminId: admin.id, actorEmail: admin.email, targetType: "news", targetId: row.id, detail: { slug } });
+  if (fields.status === "published") {
+    await logAuditEvent({ action: "content_publish", actorAdminId: admin.id, actorEmail: admin.email, targetType: "news", targetId: row.id });
+  }
   redirect(`/admin/news/${row.id}?status=${fields.status === "published" ? "created" : "created_draft"}`);
 }
 
@@ -127,28 +132,46 @@ export async function updateNewsAction(id: number, formData: FormData) {
   afterNewsChange();
   if (updated) revalidatePath(`/news/${updated.slug}`);
   revalidatePath(`/admin/news/${id}`);
+  await logAuditEvent({ action: "content_update", actorAdminId: admin.id, actorEmail: admin.email, targetType: "news", targetId: id });
+  if (current && current.published !== (fields.status === "published")) {
+    await logAuditEvent({
+      action: fields.status === "published" ? "content_publish" : "content_unpublish",
+      actorAdminId: admin.id,
+      actorEmail: admin.email,
+      targetType: "news",
+      targetId: id,
+    });
+  }
   redirect(`/admin/news/${id}?status=${fields.status === "published" ? "saved" : "saved_draft"}`);
 }
 
 export async function deleteNewsAction(id: number) {
-  await requireCapability("content:delete");
+  const admin = await requireCapability("content:delete");
   await db.delete(news).where(eq(news.id, id));
   afterNewsChange();
+  await logAuditEvent({ action: "content_delete", actorAdminId: admin.id, actorEmail: admin.email, targetType: "news", targetId: id });
   redirect("/admin/news");
 }
 
 export async function togglePublishNewsAction(id: number, nextStatus: "published" | "hidden") {
-  await requireCapability("content:publish");
+  const admin = await requireCapability("content:publish");
   await db
     .update(news)
     .set({ status: nextStatus, published: nextStatus === "published" })
     .where(eq(news.id, id));
   afterNewsChange();
+  await logAuditEvent({
+    action: nextStatus === "published" ? "content_publish" : "content_unpublish",
+    actorAdminId: admin.id,
+    actorEmail: admin.email,
+    targetType: "news",
+    targetId: id,
+  });
   revalidatePath(`/admin/news/${id}`);
 }
 
 export async function duplicateNewsAction(id: number) {
-  await requireCapability("content:edit"); // always creates a new draft, never publishes
+  const admin = await requireCapability("content:edit"); // always creates a new draft, never publishes
   const [source] = await db.select().from(news).where(eq(news.id, id)).limit(1);
   if (!source) redirect("/admin/news");
 
@@ -192,6 +215,7 @@ export async function duplicateNewsAction(id: number) {
   }
 
   afterNewsChange();
+  await logAuditEvent({ action: "content_create", actorAdminId: admin.id, actorEmail: admin.email, targetType: "news", targetId: copy.id, detail: { duplicatedFrom: id } });
   redirect(`/admin/news/${copy.id}`);
 }
 

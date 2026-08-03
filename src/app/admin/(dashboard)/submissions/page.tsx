@@ -2,6 +2,7 @@ import { db } from "@/db";
 import { formSubmissions } from "@/db/schema";
 import { desc } from "drizzle-orm";
 import { requireCapabilityOrRedirect } from "@/lib/permissions";
+import { logAuditEvent } from "@/lib/audit-log";
 
 type Attachment = { pathname: string; originalName: string; mimeType: string; sizeBytes: number };
 
@@ -10,8 +11,15 @@ function isAttachment(value: unknown): value is Attachment {
 }
 
 export default async function AdminSubmissionsPage() {
-  await requireCapabilityOrRedirect("submissions:view");
+  const admin = await requireCapabilityOrRedirect("submissions:view");
   const rows = await db.select().from(formSubmissions).orderBy(desc(formSubmissions.createdAt));
+  await logAuditEvent({
+    action: "submission_view",
+    actorAdminId: admin.id,
+    actorEmail: admin.email,
+    targetType: "form_submissions",
+    detail: { viewedCount: rows.length },
+  });
 
   return (
     <div>

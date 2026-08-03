@@ -7,6 +7,7 @@ import { db } from "@/db";
 import { adminInvites, adminUsers } from "@/db/schema";
 import { requireCapability, type AdminRole } from "@/lib/permissions";
 import { validatePassword } from "@/lib/password-policy";
+import { logAuditEvent } from "@/lib/audit-log";
 
 const INVITE_TTL_MS = 72 * 60 * 60 * 1000; // 72 hours
 
@@ -40,6 +41,14 @@ export async function createInviteAction(email: string, role: AdminRole): Promis
     tokenHash: hashToken(token),
     invitedBy: admin.id,
     expiresAt: new Date(Date.now() + INVITE_TTL_MS),
+  });
+
+  await logAuditEvent({
+    action: "user_invite",
+    actorAdminId: admin.id,
+    actorEmail: admin.email,
+    targetType: "admin_invites",
+    detail: { invitedEmail: normalizedEmail, role },
   });
 
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";

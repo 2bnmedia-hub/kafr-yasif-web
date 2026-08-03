@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { get } from "@vercel/blob";
 import { roleCan } from "@/lib/permissions";
 import { getCurrentAdmin } from "@/lib/auth";
+import { logAuditEvent } from "@/lib/audit-log";
 
 export const runtime = "nodejs";
 
@@ -33,6 +34,14 @@ export async function GET(request: Request) {
   if (!result || result.statusCode !== 200) {
     return NextResponse.json({ error: "הקובץ לא נמצא." }, { status: 404 });
   }
+
+  await logAuditEvent({
+    action: "attachment_download",
+    actorAdminId: admin.id,
+    actorEmail: admin.email,
+    targetType: "form_submissions",
+    targetId: pathname,
+  });
 
   return new NextResponse(result.stream, {
     headers: {

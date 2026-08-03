@@ -1,7 +1,8 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { verifyLogin, createSession, destroySession, isRateLimited } from "@/lib/auth";
+import { verifyLogin, createSession, destroySession, isRateLimited, getCurrentAdmin } from "@/lib/auth";
+import { logAuditEvent } from "@/lib/audit-log";
 
 export type LoginState = { status: "idle" | "error"; message?: string };
 
@@ -15,9 +16,11 @@ export async function loginAction(_prevState: LoginState, formData: FormData): P
 
   const user = await verifyLogin(email, password);
   if (!user) {
+    await logAuditEvent({ action: "login_failure", actorEmail: email });
     return { status: "error", message: "אימייל או סיסמה שגויים." };
   }
 
+  await logAuditEvent({ action: "login_success", actorAdminId: user.id, actorEmail: user.email });
   await createSession(user.id, !user.totpEnabled);
 
   if (user.totpEnabled) {
@@ -32,6 +35,10 @@ export async function loginAction(_prevState: LoginState, formData: FormData): P
 }
 
 export async function logoutAction() {
+  const admin = await getCurrentAdmin();
+  if (admin) {
+    await logAuditEvent({ action: "logout", actorAdminId: admin.id, actorEmail: admin.email });
+  }
   await destroySession();
   redirect("/admin/login");
 }

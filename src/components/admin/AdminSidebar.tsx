@@ -19,10 +19,18 @@ import {
   Users,
   ShieldCheck,
   KeyRound,
+  ScrollText,
 } from "lucide-react";
 import type { AdminRole } from "@/lib/permissions";
 
-const SITE_ADMIN_ONLY_HREFS = new Set(["/admin/settings", "/admin/ticker", "/admin/submissions", "/admin/residents", "/admin/users"]);
+const SITE_ADMIN_ONLY_HREFS = new Set([
+  "/admin/settings",
+  "/admin/ticker",
+  "/admin/submissions",
+  "/admin/residents",
+  "/admin/users",
+  "/admin/audit-log",
+]);
 
 const NAV_GROUPS = [
   {
@@ -66,6 +74,7 @@ const NAV_GROUPS = [
       { label: "פניות שהתקבלו", href: "/admin/submissions", icon: Inbox },
       { label: "משתמשים רשומים", href: "/admin/residents", icon: Users },
       { label: "משתמשי מערכת", href: "/admin/users", icon: ShieldCheck },
+      { label: "יומן ביקורת", href: "/admin/audit-log", icon: ScrollText },
     ],
   },
   {

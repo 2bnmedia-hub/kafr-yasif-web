@@ -397,3 +397,40 @@ export const residentSessions = pgTable("resident_sessions", {
   expiresAt: timestamp("expires_at").notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
+
+export const auditLogActionEnum = pgEnum("audit_log_action", [
+  "login_success",
+  "login_failure",
+  "logout",
+  "content_create",
+  "content_update",
+  "content_delete",
+  "content_publish",
+  "content_unpublish",
+  "permission_change",
+  "user_invite",
+  "submission_view",
+  "attachment_download",
+]);
+
+/**
+ * Required for a public body under the Privacy Protection (Data Security) Regulations 5777-2017:
+ * every login attempt, every content mutation, every permission change, every view of a
+ * resident's submission, every attachment download. Read-only from the admin UI — even for
+ * site-admin, there is deliberately no delete/edit action anywhere in this codebase that touches
+ * this table. Retention: 24 months (see the cleanup note in docs/handover-cio.md — nothing in
+ * this app currently prunes old rows automatically).
+ */
+export const auditLog = pgTable("audit_log", {
+  id: serial("id").primaryKey(),
+  action: auditLogActionEnum("action").notNull(),
+  // Nullable + a denormalized email snapshot: a login_failure has no matching account to
+  // reference, and an actor's account might later be deleted while the log entry must remain.
+  actorAdminId: integer("actor_admin_id").references(() => adminUsers.id, { onDelete: "set null" }),
+  actorEmail: varchar("actor_email", { length: 255 }),
+  targetType: varchar("target_type", { length: 50 }),
+  targetId: varchar("target_id", { length: 100 }),
+  ip: varchar("ip", { length: 64 }),
+  detail: jsonb("detail"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
