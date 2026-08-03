@@ -1,3 +1,4 @@
+import { headers } from "next/headers";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { LocaleProvider } from "@/i18n/LocaleProvider";
@@ -10,10 +11,11 @@ import { VisitTracker } from "@/components/layout/VisitTracker";
 export default async function PublicLayout({ children }: { children: React.ReactNode }) {
   const locale = await getServerLocale();
   const dict = getDictionary(locale);
+  const nonce = (await headers()).get("x-nonce");
 
   return (
     <LocaleProvider initialLocale={locale}>
-      <CookieConsentProvider>
+      <CookieConsentProvider nonce={nonce}>
         <a href="#main-content" className="skip-link">
           {dict.header.skipToContent}
         </a>

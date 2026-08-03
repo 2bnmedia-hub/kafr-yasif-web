@@ -31,7 +31,7 @@ function getServerSnapshot(): ConsentState | null {
   return null;
 }
 
-export function CookieConsentProvider({ children }: { children: React.ReactNode }) {
+export function CookieConsentProvider({ children, nonce }: { children: React.ReactNode; nonce: string | null }) {
   // Hydration-safe read of the visitor's stored decision: matches SSR (null) on first client
   // render, then re-syncs to the real localStorage value once mounted — no effect needed.
   const storedConsent = useSyncExternalStore(subscribe, readStoredConsent, getServerSnapshot);
@@ -58,7 +58,7 @@ export function CookieConsentProvider({ children }: { children: React.ReactNode 
   return (
     <CookieConsentContext.Provider value={{ consent: storedConsent, hasDecided, openSettings }}>
       {children}
-      <ConsentScripts />
+      <ConsentScripts nonce={nonce} />
       {!hasDecided && !settingsOpen && (
         <CookieBanner onAcceptAll={acceptAll} onRejectNonEssential={rejectNonEssential} onOpenSettings={openSettings} />
       )}

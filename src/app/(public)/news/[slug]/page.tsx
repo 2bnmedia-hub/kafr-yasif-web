@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { eq, sql } from "drizzle-orm";
@@ -62,9 +63,10 @@ export default async function NewsArticlePage({ params }: { params: Promise<{ sl
     publisher: { "@type": "Organization", name: "מועצה מקומית כפר יאסיף", url: siteUrl },
   };
 
+  const nonce = (await headers()).get("x-nonce");
   return (
     <article className="mx-auto max-w-3xl px-4 py-10 sm:px-6 lg:px-8">
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <script type="application/ld+json" nonce={nonce ?? undefined} dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <nav aria-label="breadcrumb" className="mb-6 text-sm text-ink-600">
         <ol className="flex flex-wrap items-center gap-1">
           <li>

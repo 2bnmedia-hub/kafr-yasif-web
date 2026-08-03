@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { Calendar, Clock, MapPin, Phone, User, ExternalLink, CheckCircle2 } from "lucide-react";
 import { eq, sql } from "drizzle-orm";
@@ -74,9 +75,10 @@ export default async function EventDetailPage({ params }: { params: Promise<{ sl
     organizer: { "@type": "Organization", name: "מועצה מקומית כפר יאסיף", url: siteUrl },
   };
 
+  const nonce = (await headers()).get("x-nonce");
   return (
     <PageArticle>
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <script type="application/ld+json" nonce={nonce ?? undefined} dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <Breadcrumb title={displayTitle} />
 
       <Hero title={displayTitle}>{displayDescription}</Hero>

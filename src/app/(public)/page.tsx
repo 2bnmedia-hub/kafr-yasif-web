@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import { Hero } from "@/components/home/Hero";
 import { NewsTicker } from "@/components/home/NewsTicker";
 import { NewsGrid } from "@/components/home/NewsGrid";
@@ -29,11 +30,13 @@ const jsonLd = {
   },
 };
 
-export default function Home() {
+export default async function Home() {
+  const nonce = (await headers()).get("x-nonce");
   return (
     <>
       <script
         type="application/ld+json"
+        nonce={nonce ?? undefined}
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
       <Hero />

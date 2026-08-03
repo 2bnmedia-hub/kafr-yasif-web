@@ -41,6 +41,41 @@ const NOT_FOUND_HTML = `<!DOCTYPE html>
 const LEGACY_PATH_REDIRECTS: Record<string, string> = {};
 
 /**
+ * Enforced (not Report-Only) CSP, nonce-based for scripts. A fresh nonce per request means an
+ * attacker who manages to inject a <script> tag can't get it to execute — they'd have to guess
+ * the nonce, which is why it must be unique and unpredictable every time (see the Next.js CSP
+ * guide, node_modules/next/dist/docs/01-app/02-guides/content-security-policy.md).
+ *
+ * style-src keeps 'unsafe-inline' deliberately: nonces do not cover inline style="..." attributes
+ * (only <style> elements/CSS-in-JS), and this app uses inline style={{}} props in ~20 components
+ * for one-off dynamic values (gradients, computed positions). Inline style injection is a much
+ * narrower attack surface than inline script injection (no code execution, at most a CSS-based
+ * data-exfiltration/UI-redress vector) — tightening script-src is what actually matters for XSS,
+ * and is a standard, widely-accepted trade-off rather than a compromise unique to this app.
+ *
+ * Every route in this app already renders dynamically (locale detection reads a cookie in
+ * getServerLocale, which forces dynamic rendering on its own) except /robots.txt and /sitemap.xml,
+ * neither of which serve HTML — so the "nonces require dynamic rendering" cost the Next.js docs
+ * warn about doesn't apply here; this isn't giving up any static optimization that existed before.
+ */
+function buildCspHeader(nonce: string): string {
+  return [
+    "default-src 'self'",
+    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' https://www.googletagmanager.com https://connect.facebook.net https://static.hotjar.com https://www.clarity.ms`,
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' blob: data: https://*.public.blob.vercel-storage.com https://www.facebook.com",
+    "font-src 'self' data:",
+    "connect-src 'self' https://api.open-meteo.com https://marine-api.open-meteo.com https://*.hotjar.com https://*.hotjar.io wss://*.hotjar.com https://www.clarity.ms https://c.clarity.ms https://www.facebook.com https://www.google-analytics.com https://analytics.google.com",
+    "frame-src 'self' https://www.facebook.com",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    "frame-ancestors 'none'",
+    "upgrade-insecure-requests",
+  ].join("; ");
+}
+
+/**
  * Default-deny gate for every /admin and /api/admin path (except the login page/action itself).
  * This is a network-boundary backstop, not the only check — each server action and route handler
  * still verifies its own capability (see src/lib/permissions.ts), since Server Actions are POSTs
@@ -106,8 +141,22 @@ export async function proxy(request: NextRequest) {
     });
   }
 
-  const response = NextResponse.next();
+  // Buffer.from(...).toString('base64') per the Next.js CSP guide — crypto.randomUUID() alone
+  // isn't base64 and Next expects to parse a 'nonce-{value}' token out of the CSP header value.
+  const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
+  const cspHeader = buildCspHeader(nonce);
+
+  // Setting the CSP (and x-nonce) on the *request* headers, not just the response, is what lets
+  // Next.js's own renderer read it back out and auto-apply the nonce to framework scripts and to
+  // any <Script nonce={...}> we set explicitly from a Server Component further down the tree.
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set("x-pathname", pathname);
+  requestHeaders.set("x-nonce", nonce);
+  requestHeaders.set("Content-Security-Policy", cspHeader);
+
+  const response = NextResponse.next({ request: { headers: requestHeaders } });
   response.headers.set("x-pathname", pathname);
+  response.headers.set("Content-Security-Policy", cspHeader);
 
   // Non-production environments (temporary domains, previews) must never be indexed.
   if (process.env.NEXT_PUBLIC_SITE_ENV !== "production") {
