@@ -329,6 +329,22 @@ export const adminUsers = pgTable("admin_users", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+/** Invite-only account creation: a site-admin creates a row here and shares the (one-time-shown,
+ *  never-stored-in-plaintext) invite link themselves. The invitee sets their own password when
+ *  accepting — nobody else ever sets or sees it. See src/app/actions/admin-invites.ts. */
+export const adminInvites = pgTable("admin_invites", {
+  id: serial("id").primaryKey(),
+  email: varchar("email", { length: 255 }).notNull(),
+  role: adminRoleEnum("role").notNull(),
+  tokenHash: varchar("token_hash", { length: 64 }).notNull().unique(),
+  invitedBy: integer("invited_by")
+    .notNull()
+    .references(() => adminUsers.id, { onDelete: "cascade" }),
+  expiresAt: timestamp("expires_at").notNull(),
+  usedAt: timestamp("used_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
 export const adminSessions = pgTable("admin_sessions", {
   id: varchar("id", { length: 64 }).primaryKey(),
   userId: integer("user_id")

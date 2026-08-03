@@ -49,6 +49,13 @@ const LEGACY_PATH_REDIRECTS: Record<string, string> = {};
  * default, rather than silently open until someone notices.
  */
 const ADMIN_LOGIN_PATHS = new Set(["/admin/login"]);
+// The accept-invite page/action is for someone who doesn't have an account yet — no session to
+// check. The token itself is the credential there (see acceptInviteAction's own validation).
+const ADMIN_PUBLIC_PREFIXES = ["/admin/invite/"];
+
+function isPublicAdminPath(pathname: string): boolean {
+  return ADMIN_LOGIN_PATHS.has(pathname) || ADMIN_PUBLIC_PREFIXES.some((prefix) => pathname.startsWith(prefix));
+}
 
 async function hasValidAdminSession(request: NextRequest): Promise<boolean> {
   const sessionId = request.cookies.get("admin_session")?.value;
@@ -64,7 +71,7 @@ async function hasValidAdminSession(request: NextRequest): Promise<boolean> {
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  const isAdminArea = pathname.startsWith("/admin") && !ADMIN_LOGIN_PATHS.has(pathname);
+  const isAdminArea = pathname.startsWith("/admin") && !isPublicAdminPath(pathname);
   const isAdminApi = pathname.startsWith("/api/admin");
   if (isAdminArea || isAdminApi) {
     const authenticated = await hasValidAdminSession(request);

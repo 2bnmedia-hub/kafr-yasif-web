@@ -71,6 +71,13 @@
       "when": 1785733807839,
       "tag": "0009_fluffy_joshua_kane",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1785734604646,
+      "tag": "0010_greedy_paladin",
+      "breakpoints": true
     }
   ]
 }
