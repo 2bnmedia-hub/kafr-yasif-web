@@ -78,6 +78,13 @@
       "when": 1785734604646,
       "tag": "0010_greedy_paladin",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1785735122732,
+      "tag": "0011_sour_titania",
+      "breakpoints": true
     }
   ]
 }

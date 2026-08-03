@@ -18,7 +18,16 @@ export async function loginAction(_prevState: LoginState, formData: FormData): P
     return { status: "error", message: "אימייל או סיסמה שגויים." };
   }
 
-  await createSession(user.id);
+  await createSession(user.id, !user.totpEnabled);
+
+  if (user.totpEnabled) {
+    redirect("/admin/mfa/verify");
+  }
+  if (user.role === "site-admin") {
+    // MFA is mandatory for site-admin (see CONTRIBUTING.md) — first login without it enrolled
+    // goes straight to setup, not the dashboard.
+    redirect("/admin/mfa/setup");
+  }
   redirect("/admin");
 }
 

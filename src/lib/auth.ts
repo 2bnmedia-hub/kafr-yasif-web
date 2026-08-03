@@ -4,6 +4,7 @@ import { eq, and, gte, desc } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { db } from "@/db";
 import { adminSessions, adminUsers, loginAttempts } from "@/db/schema";
+import { verifyTotpCode } from "@/lib/totp";
 
 const SESSION_COOKIE = "admin_session";
 // Sliding idle window: each authenticated request pushes expiresAt forward by this much...
@@ -55,11 +56,17 @@ export async function verifyLogin(email: string, password: string) {
   return user;
 }
 
-export async function createSession(userId: number) {
+/**
+ * mfaVerified false starts a "pending" session: it exists and is cookie-backed like any other,
+ * but getCurrentAdmin() (used by every page/action/proxy check outside the MFA flow itself)
+ * treats it as not logged in until verifyMfaAndUpgradeSession succeeds. Pass true for accounts
+ * that don't have TOTP enabled — there's nothing to verify, so there's no pending state.
+ */
+export async function createSession(userId: number, mfaVerified: boolean) {
   const id = randomBytes(32).toString("hex");
   const now = Date.now();
   const expiresAt = new Date(now + SESSION_IDLE_MS);
-  await db.insert(adminSessions).values({ id, userId, expiresAt });
+  await db.insert(adminSessions).values({ id, userId, expiresAt, mfaVerified });
 
   const cookieStore = await cookies();
   cookieStore.set(SESSION_COOKIE, id, {
@@ -80,7 +87,10 @@ export async function destroySession() {
   cookieStore.delete(SESSION_COOKIE);
 }
 
-export async function getCurrentAdmin() {
+/** Looks up the session row for the current cookie, enforcing expiry/hard-cap and sliding the
+ *  idle window — shared by getCurrentAdmin (requires mfaVerified) and getPendingMfaSession
+ *  (does not). Returns null and deletes the row if expired; does not check mfaVerified itself. */
+async function getLiveSession() {
   const cookieStore = await cookies();
   const sessionId = cookieStore.get(SESSION_COOKIE)?.value;
   if (!sessionId) return null;
@@ -108,5 +118,32 @@ export async function getCurrentAdmin() {
     await db.update(adminSessions).set({ expiresAt: nextExpiry }).where(eq(adminSessions.id, sessionId));
   }
 
+  return row;
+}
+
+/** The one check every ordinary page/action/proxy call should use — returns null for a session
+ *  that's pending MFA verification, treating it exactly like "not logged in". */
+export async function getCurrentAdmin() {
+  const row = await getLiveSession();
+  if (!row || !row.session.mfaVerified) return null;
   return row.user;
+}
+
+/** For the MFA challenge/setup pages only: returns the user for a session that exists but hasn't
+ *  completed MFA yet (or has no MFA requirement pending — callers check user.totpEnabled
+ *  themselves to decide setup vs. verify). */
+export async function getPendingMfaSession() {
+  const cookieStore = await cookies();
+  const sessionId = cookieStore.get(SESSION_COOKIE)?.value;
+  const row = await getLiveSession();
+  if (!row || row.session.mfaVerified || !sessionId) return null;
+  return { user: row.user, sessionId };
+}
+
+export async function verifyMfaAndUpgradeSession(code: string): Promise<boolean> {
+  const pending = await getPendingMfaSession();
+  if (!pending || !pending.user.totpSecret) return false;
+  if (!verifyTotpCode(pending.user.totpSecret, pending.user.email, code)) return false;
+  await db.update(adminSessions).set({ mfaVerified: true }).where(eq(adminSessions.id, pending.sessionId));
+  return true;
 }

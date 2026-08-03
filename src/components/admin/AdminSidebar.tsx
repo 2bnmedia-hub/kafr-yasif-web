@@ -18,6 +18,7 @@ import {
   FileText,
   Users,
   ShieldCheck,
+  KeyRound,
 } from "lucide-react";
 import type { AdminRole } from "@/lib/permissions";
 
@@ -66,6 +67,10 @@ const NAV_GROUPS = [
       { label: "משתמשים רשומים", href: "/admin/residents", icon: Users },
       { label: "משתמשי מערכת", href: "/admin/users", icon: ShieldCheck },
     ],
+  },
+  {
+    title: "החשבון שלי",
+    items: [{ label: "אימות דו-שלבי", href: "/admin/mfa/setup", icon: KeyRound }],
   },
 ];
 

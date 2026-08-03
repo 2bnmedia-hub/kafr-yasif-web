@@ -326,6 +326,12 @@ export const adminUsers = pgTable("admin_users", {
   // git history and isn't read by any app code found — left untouched pending investigation
   // (see docs/handover-cio.md open items) rather than colliding with or overwriting it.
   role: adminRoleEnum("access_role").notNull().default("content-editor"),
+  // TOTP secret is stored as-is (base32), not further encrypted — protected by the same DB
+  // access controls as password_hash. null until the user completes enrollment; totpEnabled
+  // only flips to true after they've proven possession by entering one real code (see
+  // confirmTotpEnrollmentAction), not merely after a secret is generated for them.
+  totpSecret: text("totp_secret"),
+  totpEnabled: boolean("totp_enabled").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -352,6 +358,10 @@ export const adminSessions = pgTable("admin_sessions", {
     .references(() => adminUsers.id, { onDelete: "cascade" }),
   expiresAt: timestamp("expires_at").notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+  // A session exists (password verified) but isn't usable for anything beyond the MFA challenge
+  // itself until this flips to true. Sessions for accounts without TOTP enabled are created with
+  // this already true (nothing to verify) — see createSession's requireMfa param.
+  mfaVerified: boolean("mfa_verified").notNull().default(false),
 });
 
 /** Failed-login tracking for rate limiting. DB-backed (not in-memory) since serverless functions
